@@ -32,7 +32,7 @@ hcho = ds['hcho_rs'][:-12,::-1,:]
 ds.close()
 
 # isoprene
-fn = 'R:/cris_isoprene/2012-2020_CrIS_monthly_Isoprene_1degree_july2017interpolated.nc'
+fn = 'R:/cris_isoprene/2012-2020_CrIS_monthly_Isoprene_1degree_vAug23_2SDmask.nc'
 ds = xr.open_dataset(fn, decode_times=True)
 isop = ds['isoprene'][:-12,:,:]
 ds.close()
@@ -270,8 +270,8 @@ methanol_wet = get_month_data([2,3,4], methanol)
 methanol_dry = get_month_data([8,9,10], methanol)
 methanol_dry_mean = crop_data(weighted_temporal_mean(methanol_dry).mean(axis=0))
 methanol_wet_mean = crop_data(weighted_temporal_mean(methanol_wet).mean(axis=0))
-methanol_dry_mean_global = weighted_temporal_mean(methanol_dry).mean(axis=0)
-methanol_wet_mean_global = weighted_temporal_mean(methanol_wet).mean(axis=0)
+# methanol_dry_mean_global = weighted_temporal_mean(methanol_dry).mean(axis=0)
+# methanol_wet_mean_global = weighted_temporal_mean(methanol_wet).mean(axis=0)
 
 hcho_dry_mean = crop_data(weighted_temporal_mean(hcho_dry_d).mean(axis=0))
 hcho_wet_mean = crop_data(weighted_temporal_mean(hcho_wet_d).mean(axis=0))
@@ -365,67 +365,67 @@ units = {1 : '[molecules cm$^{-2}$]', 2 : 'at 0.47 $\mu$m', 3 : '[ppbv]', 4 : '[
          5 : '[10$^{17}$ molecules cm$^{-2}$]', 6 : '[molecules cm$^{-2}$]'}
 
 
-projection = ccrs.PlateCarree() #ccrs.Robinson() # or ccrs.PlateCarree() for faster drawing?
-transform = ccrs.PlateCarree()
+# projection = ccrs.PlateCarree() #ccrs.Robinson() # or ccrs.PlateCarree() for faster drawing?
+# transform = ccrs.PlateCarree()
 
-longitude = isop_dry_mean.lon
-latitude = isop_wet_mean.lat
+# longitude = isop_dry_mean.lon
+# latitude = isop_wet_mean.lat
 
-data = [atmos_wet, atmos_dry]
-#, hcho_dry_mean, hcho_wet_mean,\
-#        co_dry_mean, co_wet_mean, aod_dry_mean, aod_wet_mean,\
-#            no2_dry_mean, no2_wet_mean, methanol_dry_mean, methanol_wet_mean]
-subplot_labels = ['Wet season', 'Dry season'] #, 'HCHO', 'HCHO', 'CO', 'CO', 'AOD', 'AOD', 'NO2', 'NO2', 'Methanol', 'Methanol']
+# data = [atmos_wet, atmos_dry]
+# #, hcho_dry_mean, hcho_wet_mean,\
+# #        co_dry_mean, co_wet_mean, aod_dry_mean, aod_wet_mean,\
+# #            no2_dry_mean, no2_wet_mean, methanol_dry_mean, methanol_wet_mean]
+# subplot_labels = ['Wet season', 'Dry season'] #, 'HCHO', 'HCHO', 'CO', 'CO', 'AOD', 'AOD', 'NO2', 'NO2', 'Methanol', 'Methanol']
 
-# set display parameters
-vmin = 0
-vmax = 3
-scaler = 10**15
-cmap1 = plt.cm.get_cmap('YlOrRd')
-levels = np.linspace(vmin*scaler, vmax*scaler, 11)
+# # set display parameters
+# vmin = 0
+# vmax = 3
+# scaler = 10**15
+# cmap1 = plt.cm.get_cmap('YlOrRd')
+# levels = np.linspace(vmin*scaler, vmax*scaler, 11)
 
-vmin2 = 0
-vmax2 = 1000
-scaler2 = 1
-cmap2 = plt.cm.get_cmap('Blues')
-levels2 = np.linspace(vmin2*scaler2, vmax2*scaler2, 11)
+# vmin2 = 0
+# vmax2 = 1000
+# scaler2 = 1
+# cmap2 = plt.cm.get_cmap('Blues')
+# levels2 = np.linspace(vmin2*scaler2, vmax2*scaler2, 11)
 
-# set up figure
-fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 7), subplot_kw={'projection':projection})
-axes = axes.ravel()
+# # set up figure
+# fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 7), subplot_kw={'projection':projection})
+# axes = axes.ravel()
 
-# first panel (saved as im for colour bar creation)
-im = axes[0].contourf(longitude, latitude, data[0], levels = levels, cmap = cmap1, extend = 'max', transform=transform) #
+# # first panel (saved as im for colour bar creation)
+# im = axes[0].contourf(longitude, latitude, data[0], levels = levels, cmap = cmap1, extend = 'max', transform=transform) #
 
-# repeat for other years
-for i,y in enumerate(data):
-    axes[i].set_title(subplot_labels[i], fontsize = 12)
-    axes[i].coastlines()
-    axes[i].contourf(longitude, latitude, data[i], levels = levels, cmap = cmap1, extend = 'max', transform=transform) #levels = levels, 
-    axes[i].set_extent([int(min_lon), int(max_lon), int(min_lat), int(max_lat)], crs = transform)
-    axes[i].contourf(longitude, latitude, high_elev, levels = levels2, cmap = cmap2, extend = 'max', alpha = 0.3, transform=transform )
-    gl = axes[i].gridlines(draw_labels=True)
-    gl.xlocator = mticker.FixedLocator([-65, -60, -55])
-    gl.ylocator = mticker.FixedLocator([-10, -20])
+# # repeat for other years
+# for i,y in enumerate(data):
+#     axes[i].set_title(subplot_labels[i], fontsize = 12)
+#     axes[i].coastlines()
+#     axes[i].contourf(longitude, latitude, data[i], levels = levels, cmap = cmap1, extend = 'max', transform=transform) #levels = levels, 
+#     axes[i].set_extent([int(min_lon), int(max_lon), int(min_lat), int(max_lat)], crs = transform)
+#     axes[i].contourf(longitude, latitude, high_elev, levels = levels2, cmap = cmap2, extend = 'max', alpha = 0.3, transform=transform )
+#     gl = axes[i].gridlines(draw_labels=True)
+#     gl.xlocator = mticker.FixedLocator([-65, -60, -55])
+#     gl.ylocator = mticker.FixedLocator([-10, -20])
 
-scalebar = ScaleBar(dx) #units = 'deg', dimension = 'angle')
-plt.gca().add_artist(scalebar)
+# scalebar = ScaleBar(dx) #units = 'deg', dimension = 'angle')
+# plt.gca().add_artist(scalebar)
     
-# set title and layout
-# fig.suptitle('Mean cover %', fontsize = 16)
-fig.tight_layout()
-fig.subplots_adjust(bottom=0.1)
+# # set title and layout
+# # fig.suptitle('Mean cover %', fontsize = 16)
+# fig.tight_layout()
+# fig.subplots_adjust(bottom=0.1)
 
-# add colorbar, vertical or horizontal
-# cax = fig.add_axes([0.9, 0.05, 0.02, 0.87])
-# cb = fig.colorbar(im, cax=cax, orientation='vertical')
-cax = fig.add_axes([0.1, 0.1, 0.8, 0.02])
-cb = fig.colorbar(im, cax=cax, orientation='horizontal')
+# # add colorbar, vertical or horizontal
+# # cax = fig.add_axes([0.9, 0.05, 0.02, 0.87])
+# # cb = fig.colorbar(im, cax=cax, orientation='vertical')
+# cax = fig.add_axes([0.1, 0.1, 0.8, 0.02])
+# cb = fig.colorbar(im, cax=cax, orientation='horizontal')
 
-cb.set_label(f'{labels[atmos_no]} {units[atmos_no]}', fontsize = 12)
+# cb.set_label(f'{labels[atmos_no]} {units[atmos_no]}', fontsize = 12)
 
-# save figure
-# fig.savefig(f'M:/figures/atm_chem/comparison/SouthAmazon_stats/Summary/{labels[atmos_no]}_maps_whighelev.png', dpi = 300)
+# # save figure
+# # fig.savefig(f'M:/figures/atm_chem/comparison/SouthAmazon_stats/Summary/{labels[atmos_no]}_maps_whighelev.png', dpi = 300)
 
 
 # =============================================================================
@@ -532,7 +532,7 @@ cb3.ax.tick_params(labelsize=8)
 cb3.set_label('(e), (f): Formaldehyde (molecules cm$^{-2}$)', fontsize = 8)
 
 # save figure
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f03.png', dpi = 300)
+fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f03.png', dpi = 300)
 
 
 # =============================================================================
