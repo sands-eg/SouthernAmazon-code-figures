@@ -201,7 +201,10 @@ def calc_statistic(data, stat = 'median'):
             data_means[i]=a.mean()
     elif stat == 'median':
         for i,a in enumerate(data):
-            data_means[i]=np.median(a)  
+            data_means[i]=np.median(a) 
+    elif stat == 'std':
+        for i,a in enumerate(data):
+            data_means[i] = a.std()
     else:
         print('invalid stat')
     
@@ -385,6 +388,8 @@ lc_labels = ['Broadleaf forest']
 
 
 plot_data = []
+std_data = []
+len_data = []
 
 for i in range(1, 7):
     lc = broadleaf_crop
@@ -504,6 +509,11 @@ for i in range(1, 7):
     data3_means = calc_statistic(data3, stat='mean')
     data4_means = calc_statistic(data4, stat='mean')
     
+    data1_stds = calc_statistic(data1, stat='std')
+    data2_stds = calc_statistic(data2, stat='std')
+    data3_stds = calc_statistic(data3, stat='std')
+    data4_stds = calc_statistic(data4, stat='std')
+    
     # data_means = [data1_means, data3_means, data2_means, data4_means]
     
     # data1_weighted = data1_means * data1_len / data3_len
@@ -511,14 +521,31 @@ for i in range(1, 7):
     
     data =[data1_means, data2_means, data3_means, data4_means]
     
+    data_std = [data1_stds, data2_stds, data3_stds, data4_stds]
+    
+    data_len = [data1_len, data2_len, data3_len, data4_len]
+    
+    stds_array = np.zeros((4, 10))
+    len_array = np.zeros((4,10))
+    
     for x in range(4):
         lc_means[x,:] = data[x] 
+        stds_array[x, :] = data_std[x]
+        len_array[x, :] = data_len[x]
     
     plot_data.append(lc_means)
+    std_data.append(stds_array)
+    len_data.append(len_array)
 
 plot_data[0] = plot_data[0]/10**16
 plot_data[2] = plot_data[2]/10**16
 plot_data[5] = plot_data[5]/10**15
+
+std_data[0] = std_data[0]/10**16
+std_data[2] = std_data[2]/10**16
+std_data[5] = std_data[5]/10**15
+
+
 # # =============================================================================
 # # heatmap plot
 # # =============================================================================
@@ -555,12 +582,12 @@ units = {1 : '(10$^{16}$ molecules cm$^{-2}$)', 2 : '(ppbv)', 3 : '(10$^{16}$ mo
 alphabet = ['a', 'b', 'c', 'd', 'e', 'f',]
 categories = ['H', 'L', 'D', 'W']
 cm = 1/2.54
-fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 18*cm))
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 14*cm))
 axes = axes.ravel()
 
 for i in range(6):
     sns.heatmap(plot_data[i],  cmap='YlGnBu', ax = axes[i], cbar_kws = {'label':f'{labels[i+1]} {units[i+1]}',\
-                                                                        'location':'bottom'})
+                                                                        'location':'right'})
     axes[i].text(-2, 0, f'({alphabet[i]})', fontsize = 10)
     axes[i].set_yticklabels(categories, fontsize=8)
     axes[i].set_xlim(0,10)
@@ -569,7 +596,7 @@ for i in range(6):
     axes[i].set_xlabel('Broadleaf forest cover (%)', fontsize = 8)
     cbar = axes[i].collections[0].colorbar
     cbar.ax.tick_params(labelsize=7)
-    cbar.set_label(f'{labels[i+1]} {units[i+1]}', fontsize = 8)
+    cbar.set_label(f'{labels[i+1]} \n{units[i+1]}', fontsize = 8)
 
 
 fig.tight_layout()
@@ -577,4 +604,4 @@ fig.tight_layout()
 
 
 # save figure
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f06.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f06_resized.png', dpi = 300)

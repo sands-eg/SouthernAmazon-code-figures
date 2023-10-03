@@ -583,4 +583,4 @@ fig.subplots_adjust(bottom=0.2)
 
 
 # save figure
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f07.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/burned_area_distribution.png', dpi = 300)

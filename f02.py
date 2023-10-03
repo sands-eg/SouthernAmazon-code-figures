@@ -312,7 +312,7 @@ cb2 = fig.colorbar(im2, cax=cax2, orientation='horizontal')
 cb.set_label('% grid cell cover (subplots a, b)', fontsize = 12)
 cb2.set_label('Elevation m a.s.l. (subplot c)', fontsize = 12)
 # save figure
-fig.savefig('M:/figures/atm_chem/comparison/SouthAmazon_stats/Summary/landcover_and_elevation.png', dpi = 300)
+# fig.savefig('M:/figures/atm_chem/comparison/SouthAmazon_stats/Summary/landcover_and_elevation.png', dpi = 300)
 
 
 # =============================================================================
@@ -446,6 +446,14 @@ cb2.set_label(f'% {labels[2]}', fontsize = 12)
 # =============================================================================
 # Mean monthly fire for wet and dry season
 # =============================================================================
+# min_time = xr.DataArray(data = [fire.time.min().values, isop.time.min().values]).max().values
+# min_year = min_time.astype(str).split('-')[0]
+# max_time = xr.DataArray(data = [fire.time.max().values, isop.time.max().values]).min().values
+# max_year = max_time.astype(str).split('-')[0]
+
+# fire_slice = fire.sel(time=slice(min_year, max_year))
+# fire_wet = get_month_data([2,3,4], fire_slice)
+# fire_dry = get_month_data([8,9,10], fire_slice) 
 
 fire_wet = get_month_data([2,3,4], fire)
 fire_dry = get_month_data([8,9,10], fire)
@@ -694,5 +702,5 @@ cb.set_label('Land type (% grid cell cover, subplots a, b)', fontsize = 8)
 cb2.set_label('Elevation (m a.s.l., subplot c)', fontsize = 8)
 cb3.set_label('Dry season burned area (10$^{2}$ x % grid cell area, subplot d)', fontsize = 8)
 # save figure
-fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f02_4panel.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f02_4panel.png', dpi = 300)
 

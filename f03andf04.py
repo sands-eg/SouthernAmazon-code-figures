@@ -532,7 +532,7 @@ cb3.ax.tick_params(labelsize=8)
 cb3.set_label('(e), (f): Formaldehyde (molecules cm$^{-2}$)', fontsize = 8)
 
 # save figure
-fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f03.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f03.png', dpi = 300)
 
 
 # =============================================================================
@@ -639,4 +639,218 @@ cb3.ax.tick_params(labelsize=8)
 cb3.set_label('(e), (f): Nitrogen dioxide (molecules cm$^{-2}$)', fontsize = 8)
 
 # save figure
-fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f04.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f04.png', dpi = 300)
+
+
+# =============================================================================
+# f03.png Isoprene, Methanol and Formaldehyde seasonal maps - resized 
+# =============================================================================
+min_lon = -70
+max_lon =  -50 
+min_lat =   -25  
+max_lat = -5 
+
+projection = ccrs.PlateCarree() #ccrs.Robinson() # or ccrs.PlateCarree() for faster drawing?
+transform = ccrs.PlateCarree()
+
+longitude = isop_dry_mean.lon
+latitude = isop_wet_mean.lat
+
+data = [isop_wet_mean, isop_dry_mean, methanol_wet_mean, methanol_dry_mean, hcho_wet_mean, hcho_dry_mean]
+#, hcho_dry_mean, hcho_wet_mean,\
+#        co_dry_mean, co_wet_mean, aod_dry_mean, aod_wet_mean,\
+#            no2_dry_mean, no2_wet_mean, methanol_dry_mean, methanol_wet_mean]
+subplot_labels = ['Wet season', 'Dry season'] #, 'HCHO', 'HCHO', 'CO', 'CO', 'AOD', 'AOD', 'NO2', 'NO2', 'Methanol', 'Methanol']
+alphabet = ['a', 'b', 'c', 'd', 'e', 'f',]
+# set display parameters
+vmin1 = 0
+vmax1 = 2
+scaler1 = 10**16
+cmap1 = plt.cm.get_cmap('YlOrRd')
+levels1 = np.linspace(vmin1*scaler1, vmax1*scaler1, 11)
+
+vmin3 = 0
+vmax3 = 1
+scaler3 = 1
+cmap3 = plt.cm.get_cmap('YlOrRd')
+levels3 = np.linspace(vmin3*scaler3, vmax3*scaler3, 11)
+
+vmin4 = 0
+vmax4 = 2
+scaler4 = 10**16
+cmap4 = plt.cm.get_cmap('YlOrRd')
+levels4 = np.linspace(vmin4*scaler4, vmax4*scaler4, 11)
+
+
+vmin2 = 0
+vmax2 = 1000
+scaler2 = 1
+cmap2 = plt.cm.get_cmap('Greys')
+levels2 = np.linspace(vmin2*scaler2, vmax2*scaler2, 11)
+
+# set up figure
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 14*cm), subplot_kw={'projection':projection})
+axes = axes.ravel()
+
+# first panel (saved as im for colour bar creation)
+im1 = axes[0].contourf(longitude, latitude, data[0]/10**16, levels = levels1/10**16, cmap = cmap1, extend = 'max', transform=transform)
+im2 = axes[2].contourf(longitude, latitude, data[2], levels = levels3, cmap = cmap3, extend = 'max', transform=transform)
+im3 = axes[4].contourf(longitude, latitude, data[4]/10**16, levels = levels4/10**16, cmap = cmap4, extend = 'max', transform=transform) #
+
+# repeat for other years
+for i,y in enumerate(data):
+    axes[i].coastlines()
+    if i < 2:
+        axes[i].set_title(subplot_labels[i], fontsize = 10)
+        axes[i].contourf(longitude, latitude, data[i], levels = levels1, cmap = cmap1, extend = 'max', transform=transform) #levels = levels, 
+    elif i < 4 and i > 1:
+        axes[i].contourf(longitude, latitude, data[i], levels = levels3, cmap = cmap3, extend = 'max', transform=transform) 
+    elif i > 3:
+        axes[i].contourf(longitude, latitude, data[i], levels = levels4, cmap = cmap4, extend = 'max', transform=transform)
+    axes[i].set_extent([int(min_lon), int(max_lon), int(min_lat), int(max_lat)], crs = transform)
+    axes[i].contourf(longitude, latitude, high_elev, levels = levels2, cmap = cmap2, extend = 'max', alpha = 0.7, transform=transform )
+    gl = axes[i].gridlines(draw_labels=True)
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlocator = mticker.FixedLocator([-65, -55])
+    gl.ylocator = mticker.FixedLocator([-10, -20])
+    gl.xlabel_style = {'size' : 8}
+    gl.ylabel_style = {'size' : 8}
+    axes[i].add_feature(cfeature.BORDERS, zorder=10)
+    axes[i].text(-73, -7, f'({alphabet[i]})', fontsize = 10)
+
+
+scalebar = ScaleBar(dx, box_alpha=0.6)#, location = 'lower right', box_color='white') #units = 'deg', dimension = 'angle')
+plt.gca().add_artist(scalebar)
+    
+# set title and layout
+# fig.suptitle('Mean cover %', fontsize = 16)
+fig.tight_layout()
+fig.subplots_adjust(right=0.8)
+
+# add colorbars
+cax1 = fig.add_axes([0.8, 0.68, 0.02, 0.25])
+cb1 = fig.colorbar(im1, cax=cax1, orientation='vertical')
+cb1.ax.tick_params(labelsize=8)
+cb1.set_label('(a), (b): Isoprene \n(10$^{16}$ molecules cm$^{-2}$)', fontsize = 8)
+
+cax2 = fig.add_axes([0.8, 0.37, 0.02, 0.25])
+cb2 = fig.colorbar(im2, cax=cax2, orientation='vertical')
+cb2.ax.tick_params(labelsize=8)
+cb2.set_label('(c), (d): Methanol (ppbv)', fontsize = 8)
+
+cax3 = fig.add_axes([0.8, 0.05, 0.02, 0.25])
+cb3 = fig.colorbar(im3, cax=cax3, orientation='vertical')
+cb3.ax.tick_params(labelsize=8)
+cb3.set_label('(e), (f): Formaldehyde \n(10$^{16}$ molecules cm$^{-2}$)', fontsize = 8)
+
+# save figure
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f03_resized.png', dpi = 300)
+
+
+# =============================================================================
+# f04.png Carbon monoxide, AOD, NO2 seasonal maps - resized
+# =============================================================================
+min_lon = -70
+max_lon =  -50 
+min_lat =   -25  
+max_lat = -5 
+
+projection = ccrs.PlateCarree() #ccrs.Robinson() # or ccrs.PlateCarree() for faster drawing?
+transform = ccrs.PlateCarree()
+
+longitude = co_dry_mean.lon
+latitude = co_wet_mean.lat
+
+data = [co_wet_mean, co_dry_mean, aod_wet_mean, aod_dry_mean, no2_wet_mean, no2_dry_mean]
+#, hcho_dry_mean, hcho_wet_mean,\
+#        co_dry_mean, co_wet_mean, aod_dry_mean, aod_wet_mean,\
+#            no2_dry_mean, no2_wet_mean, methanol_dry_mean, methanol_wet_mean]
+subplot_labels = ['Wet season', 'Dry season'] #, 'HCHO', 'HCHO', 'CO', 'CO', 'AOD', 'AOD', 'NO2', 'NO2', 'Methanol', 'Methanol']
+alphabet = ['a', 'b', 'c', 'd', 'e', 'f',]
+# set display parameters
+vmin1 = 0
+vmax1 = 4
+scaler1 = 10
+cmap1 = plt.cm.get_cmap('YlOrRd')
+levels1 = np.linspace(vmin1*scaler1, vmax1*scaler1, 11)
+
+vmin3 = 0
+vmax3 = 1
+scaler3 = 1
+cmap3 = plt.cm.get_cmap('YlOrRd')
+levels3 = np.linspace(vmin3*scaler3, vmax3*scaler3, 11)
+
+vmin4 = 0
+vmax4 = 3
+scaler4 = 10**15
+cmap4 = plt.cm.get_cmap('YlOrRd')
+levels4 = np.linspace(vmin4*scaler4, vmax4*scaler4, 11)
+
+
+vmin2 = 0
+vmax2 = 1000
+scaler2 = 1
+cmap2 = plt.cm.get_cmap('Greys')
+levels2 = np.linspace(vmin2*scaler2, vmax2*scaler2, 11)
+
+# set up figure
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 14*cm), subplot_kw={'projection':projection})
+axes = axes.ravel()
+
+# first panel (saved as im for colour bar creation)
+im1 = axes[0].contourf(longitude, latitude, data[0], levels = levels1, cmap = cmap1, extend = 'max', transform=transform)
+im2 = axes[2].contourf(longitude, latitude, data[2], levels = levels3, cmap = cmap3, extend = 'max', transform=transform)
+im3 = axes[4].contourf(longitude, latitude, data[4]/10**15, levels = levels4/10**15, cmap = cmap4, extend = 'max', transform=transform) #
+
+# repeat for other years
+for i,y in enumerate(data):
+    axes[i].coastlines()
+    if i < 2:
+        axes[i].set_title(subplot_labels[i], fontsize = 10)
+        axes[i].contourf(longitude, latitude, data[i], levels = levels1, cmap = cmap1, extend = 'max', transform=transform) #levels = levels, 
+    elif i < 4 and i > 1:
+        axes[i].contourf(longitude, latitude, data[i], levels = levels3, cmap = cmap3, extend = 'max', transform=transform) 
+    elif i > 3:
+        axes[i].contourf(longitude, latitude, data[i], levels = levels4, cmap = cmap4, extend = 'max', transform=transform)
+    axes[i].set_extent([int(min_lon), int(max_lon), int(min_lat), int(max_lat)], crs = transform)
+    axes[i].contourf(longitude, latitude, high_elev, levels = levels2, cmap = cmap2, extend = 'max', alpha = 0.7, transform=transform )
+    gl = axes[i].gridlines(draw_labels=True)
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlocator = mticker.FixedLocator([-65, -55])
+    gl.ylocator = mticker.FixedLocator([-10, -20])
+    gl.xlabel_style = {'size' : 8}
+    gl.ylabel_style = {'size' : 8}
+    axes[i].add_feature(cfeature.BORDERS, zorder=10)
+    axes[i].text(-73, -7, f'({alphabet[i]})', fontsize = 10)
+
+
+scalebar = ScaleBar(dx, box_alpha=0.6)#, location = 'lower right', box_color='white') #units = 'deg', dimension = 'angle')
+plt.gca().add_artist(scalebar)
+    
+# set title and layout
+# fig.suptitle('Mean cover %', fontsize = 16)
+fig.tight_layout()
+fig.subplots_adjust(right=0.8)
+
+# add colorbars
+cax1 = fig.add_axes([0.8, 0.68, 0.02, 0.25])
+cb1 = fig.colorbar(im1, cax=cax1, orientation='vertical')
+cb1.ax.tick_params(labelsize=8)
+cb1.set_label('(a), (b): Carbon monoxide \n(10$^{17}$ molecules cm$^{-2}$)', fontsize = 8)
+
+cax2 = fig.add_axes([0.8, 0.37, 0.02, 0.25])
+cb2 = fig.colorbar(im2, cax=cax2, orientation='vertical')
+cb2.ax.tick_params(labelsize=8)
+cb2.set_label('(c), (d): Aerosol optical depth \nat 0.47 $\mu$m', fontsize = 8)
+
+cax3 = fig.add_axes([0.8, 0.05, 0.02, 0.25])
+cb3 = fig.colorbar(im3, cax=cax3, orientation='vertical')
+cb3.ax.tick_params(labelsize=8)
+cb3.set_label('(e), (f): Nitrogen dioxide \n(10$^{15}$ molecules cm$^{-2}$)', fontsize = 8)
+
+# save figure
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f04_resized.png', dpi = 300)

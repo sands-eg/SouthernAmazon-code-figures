@@ -437,10 +437,11 @@ for j, y in enumerate(lcs):
         atmos_wet = mask_high_elev(atmos_wet, high_elev)
         
         ### keeping only data for months where both datasets are available
-        min_time = xr.DataArray(data = [fire_dry.time.min().values, atmos_dry.time.min().values]).max().values
+        min_time = xr.DataArray(data = [fire_dry.time.min().values, isop_dry.time.min().values]).max().values
         min_year = min_time.astype(str).split('-')[0]
-        max_time = xr.DataArray(data = [fire_dry.time.max().values, atmos_dry.time.max().values]).min().values
+        max_time = xr.DataArray(data = [fire_dry.time.max().values, isop_dry.time.max().values]).min().values
         max_year = max_time.astype(str).split('-')[0]
+
         
         fire_slice = fire_dry.sel(time=slice(min_year, max_year))
         atmos_dry_slice = atmos_dry.sel(time=slice(min_year, max_year))
@@ -614,59 +615,4 @@ fig.subplots_adjust(bottom=0.2)
 
 
 # save figure
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f07.png', dpi = 300)
-
-# =============================================================================
-# broadleaf heatmaps for all 6 species - resized
-# =============================================================================
-plot_data = [tmp_isop, tmp_met, tmp_hcho, tmp_co, tmp_aod, tmp_no2]
-
-labels = {1 : 'Isoprene', 2 :  'Methanol', 3 : 'HCHO', 4 : 'CO', 5 : 'AOD', 6 : 'NO$_{2}$'}
-
-units = {1 : '(10$^{16}$ molecules cm$^{-2}$)', 2 : '(ppbv)', 3 : '(10$^{16}$ molecules cm$^{-2}$)', 4 : '(10$^{17}$ molecules cm$^{-2}$)',\
-          5 : 'at 0.47 $\mu$m', 6 : '(10$^{15}$ molecules cm$^{-2}$)'}
-
-
-alphabet = ['a', 'b', 'c', 'd', 'e', 'f',]
-categories = ['F', 'S', 'G']
-cm = 1/2.54
-fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 15*cm))
-axes = axes.ravel()
-cax1 = fig.add_axes([0.05, 0.10, 0.9, 0.02])
-
-for i in range(6):
-    axes[i].set_title(f'({alphabet[i]}) {labels[i+1]}', fontsize = 10)
-    if i == 5:
-    
-        sns.heatmap(plot_data[i]*100,  cmap='seismic', vmin=0, vmax=100,  ax = axes[i],\
-                    cbar_ax = cax1, cbar_kws = {'orientation' : 'horizontal'}) #'label':f'{labels[i+1]} {units[i+1]}', cbar_kws = {'location':'bottom'}, 
-        cbar = axes[i].collections[0].colorbar
-        cbar.ax.tick_params(labelsize=8)
-        cbar.set_label('Proportion of regional mean from high fire grid cells (%)', fontsize = 8)
-    else:
-        sns.heatmap(plot_data[i]*100,  cmap='seismic', vmin=0, vmax=100,  ax = axes[i], cbar = False)
-    #cbar_kws = {'label':f'{labels[i+1]} {units[i+1]}', 'location':'bottom'}
-    # axes[i].text(-2, 0, f'({alphabet[i]})', fontsize = 10)
-    axes[i].set_yticklabels(categories, fontsize=8)
-    axes[i].set_xlim(0,10)
-    axes[i].set_xticks(np.arange(2,11, 2))
-    axes[i].set_xticklabels(range(20,101, 20), fontsize = 8)
-    axes[i].set_xlabel('Land type cover (%)', fontsize = 8)
-    # cbar = axes[i].collections[0].colorbar
-    # cbar.ax.tick_params(labelsize=8)
-    # cbar.set_label(f'{labels[i+1]} {units[i+1]}', fontsize = 8)
-
-# add colorbars
-# im1 = sns.heatmap(plot_data[0]*100,  cmap='seismic', vmin=0, vmax=100, cbar = True)
-# cax1 = fig.add_axes([0.13, 0.20, 0.8, 0.01])
-# cb1 = fig.colorbar(im1, cax=cax1, orientation='horizontal')
-# cb1.ax.tick_params(labelsize=8)
-# cb1.set_label('(a), (b): Isoprene (molecules cm$^{-2}$)', fontsize = 8)
-
-
-fig.tight_layout()
-fig.subplots_adjust(bottom=0.2)
-
-
-# save figure
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f07_resized.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f07_2012-2016_only.png', dpi = 300)

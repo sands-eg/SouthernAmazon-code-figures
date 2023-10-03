@@ -213,16 +213,25 @@ isop_elev = mask_high_elev(isop_crop, high_elev)
 methanol_elev = mask_high_elev(methanol_crop, high_elev)
 
 # =============================================================================
+# Crop to 2012-2016
+# =============================================================================
+min_time = xr.DataArray(data = [fire_elev.time.min().values, isop_elev.time.min().values]).max().values
+min_year = min_time.astype(str).split('-')[0]
+max_time = xr.DataArray(data = [fire_elev.time.max().values, isop_elev.time.max().values]).min().values
+max_year = max_time.astype(str).split('-')[0]
+
+# fire_slice = fire_dry.sel(time=slice(min_year, max_year))
+# =============================================================================
 # Get monthly means
 # =============================================================================
 
-hcho_spatial = spatial_weighted_average(hcho_elev, weights_crop)
-co_spatial = spatial_weighted_average(co_elev, weights_crop)
-aod_spatial = spatial_weighted_average(aod_elev, weights_crop)
-isop_spatial = spatial_weighted_average(isop_elev, weights_crop)
-methanol_spatial = spatial_weighted_average(methanol_elev, weights_crop)
-no2_spatial = spatial_weighted_average(no2_elev, weights_crop)
-fire_spatial = spatial_weighted_average(fire_elev, weights_crop)
+hcho_spatial = spatial_weighted_average(hcho_elev.sel(time=slice(min_year, max_year)), weights_crop)
+co_spatial = spatial_weighted_average(co_elev.sel(time=slice(min_year, max_year)), weights_crop)
+aod_spatial = spatial_weighted_average(aod_elev.sel(time=slice(min_year, max_year)), weights_crop)
+isop_spatial = spatial_weighted_average(isop_elev.sel(time=slice(min_year, max_year)), weights_crop)
+methanol_spatial = spatial_weighted_average(methanol_elev.sel(time=slice(min_year, max_year)), weights_crop)
+no2_spatial = spatial_weighted_average(no2_elev.sel(time=slice(min_year, max_year)), weights_crop)
+fire_spatial = spatial_weighted_average(fire_elev.sel(time=slice(min_year, max_year)), weights_crop)
 
 # =============================================================================
 # Seasonal cycle
@@ -231,12 +240,11 @@ fire_spatial = spatial_weighted_average(fire_elev, weights_crop)
 def seasonal_cycle(data):
     months = np.arange(1, 13)
     mon = data.groupby('time.month').groups
-    seasonal_cycle = np.zeros((12,3)) #(12, fire_crop.shape[1], fire_crop.shape[2]))
+    seasonal_cycle = np.zeros((12,2)) #(12, fire_crop.shape[1], fire_crop.shape[2]))
     for i, m in enumerate(months):
         mon_idxs = mon[m]
         seasonal_cycle[i, 0]=data.isel(time=mon_idxs).mean()
         seasonal_cycle[i, 1]=data.isel(time=mon_idxs).std()
-        seasonal_cycle[i, 2]=len(data.isel(time=mon_idxs))
         # option to add standard deviation etc
     return seasonal_cycle
         
@@ -259,16 +267,15 @@ months_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',\
 fig1, ax1 = plt.subplots(figsize=(12, 8))
 for i in range(7):
     ax1.plot(months, data[i][:,0]/data[i][:,0].max(), label = f'{labels[i]}')
-    # ax1.errorbar(months, data[i][:,0]/data[i][:,0].max(), data[i][:,1]/np.sqrt(data[i][:,2])/data[i][:,0].max(),\
-    #              linestyle = '--', capsize = 4, label = f'{labels[i]}')
 ax1.legend(loc='upper left')
 ax1.set_ylabel('Proportion of maximum monthly mean', fontsize = 16)
 ax1.set_xlabel('Month', fontsize = 16)
 ax1.set_xticks(np.arange(1,13, 1))
 ax1.set_xticklabels(months_labels, fontsize = 10)
 
-for i in range(7):
-    pd.DataFrame(data[i]).to_csv(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_data_outputs/seasonal_cycle/{labels[i]}_month_mean_std.csv')
+for i in range(6):
+    pd.DataFrame(data[i]).to_csv(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_data_outputs/seasonal_cycle/2012-2016{labels[i]}_month_mean_std.csv')
+
 
 # fig1, ax1 = plt.subplots(figsize=(12, 8))
 # ax1.plot(months, np.nanmean(seasonal_cycle, axis=(1,2)), label = 'methanol')
@@ -282,9 +289,7 @@ for i in range(7):
 # ax2.legend()
 
 # save figure
-# fig1.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f05.png', dpi = 300)
-
-# fig1.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f05_errorbars.png', dpi = 300)
+# fig1.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f05_2012-2016.png', dpi = 300)
 
 
 # =============================================================================
