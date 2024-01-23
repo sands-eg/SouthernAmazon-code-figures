@@ -36,7 +36,12 @@ ds = xr.open_dataset(fn, decode_times=True)
 fire = ds['Burned area']*100 
 fire['time'] = pd.date_range('2001-01-01', '2016-12-31', freq = 'MS')
 ds.close()
-
+# burned area GFED5
+fn = 'R:\gfed\GFED5\GFED5_totalBA_2001-2020.nc'
+ds = xr.open_dataset(fn, decode_times=True)
+fire2 = ds['__xarray_dataarray_variable__']#*100 
+fire2['time'] = pd.date_range('2001-01-01', '2020-12-31', freq = 'MS')
+ds.close()
 ## atmospheric composition
 
 # HCHO
@@ -260,12 +265,12 @@ spatial_weights = surface_area_earth / np.max(surface_area_earth)
 
 spatial_weights = xr.DataArray(data = spatial_weights, coords = {"lat": fire.lat, "lon": fire.lon})
 
-
+fire2 = fire2.fillna(0)/surface_area_earth *100
 # =============================================================================
 # crop data to region of interest
 # =============================================================================
 
-fire_crop = crop_data(fire)
+fire_crop = crop_data(fire2)
 
 hcho_crop = crop_data(hcho)
 co_crop = crop_data(co)
@@ -450,7 +455,7 @@ for j, y in enumerate(lcs):
         lc_int = np.rint(lc_slice) #if LC B used
         
         ### masking fire occurrence
-        boundary = 0.004
+        boundary = 0.05#0.004
         no_fire = ma.masked_less_equal(fire_slice, boundary).mask
         yes_fire = ma.masked_greater(fire_slice, boundary).mask
             
@@ -669,4 +674,4 @@ fig.subplots_adjust(bottom=0.2)
 
 
 # save figure
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f07_resized.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f07_resized_gfed5_b05.png', dpi = 300)

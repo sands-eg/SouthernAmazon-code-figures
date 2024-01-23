@@ -31,12 +31,16 @@ cell_areas_1 = np.load('R:\modis_1_deg_cell_area.npy')
 cell_areas_1xr = xr.DataArray(data = cell_areas_1[:], coords = {"lat": fc.lat.values, "lon":fc.lon.values})
 
 # burned area
+# fn = 'R:\\gfed\\monthly_1degree_sum_2001-2016.nc'
+# ds = xr.open_dataset(fn, decode_times=True)
+# fire = ds['Burned area']
+# fire['time'] = pd.date_range('2001-01-01', '2016-12-31', freq = 'MS')
+# ds.close()
 fn = 'R:\\gfed\\GFED4_BAkm2_2001-2016.nc'
 ds = xr.open_dataset(fn, decode_times=True)
 fire = ds['Burned Area']
 fire['time'] = pd.date_range('2001-01-01', '2016-12-31', freq = 'MS')
 ds.close()
-
 
 
 # burned area GFED5
@@ -89,6 +93,11 @@ fn = 'R:/DEM/SAM_DEM.nc'
 ds = xr.open_dataset(fn)
 dem = ds['SAM_DEM']
 ds.close()  
+
+fn = 'R:\modis_lai\lai_2001-2019_interpolated_monthly.nc'
+ds = xr.open_dataset(fn, decode_times=True)
+lai = ds['__xarray_dataarray_variable__'][:]/10
+ds.close()
 
 # =============================================================================
 # Define functions
@@ -168,7 +177,7 @@ fire = fire.fillna(0)/surface_area_earth *100
 # =============================================================================
 fire2_crop = crop_data(fire2)
 fire_crop = crop_data(fire)
-
+lai_crop = crop_data(lai)
 hcho_crop = crop_data(hcho)
 co_crop = crop_data(co)
 no2_crop = crop_data(no2)
@@ -216,6 +225,7 @@ high_elev = ma.masked_greater_equal(dem_crop, elev_boundary).mask
 
 fire_elev = mask_high_elev(fire_crop, high_elev)
 fire2_elev = mask_high_elev(fire2_crop, high_elev)
+lai_elev = mask_high_elev(lai_crop, high_elev)
 
 hcho_elev = mask_high_elev(hcho_crop, high_elev)
 co_elev = mask_high_elev(co_crop, high_elev)
@@ -236,7 +246,7 @@ methanol_spatial = spatial_weighted_average(methanol_elev, weights_crop)
 no2_spatial = spatial_weighted_average(no2_elev, weights_crop)
 fire_spatial = spatial_weighted_average(fire_elev, weights_crop)
 fire2_spatial = spatial_weighted_average(fire2_elev, weights_crop)
-
+lai_spatial = spatial_weighted_average(lai_elev, weights_crop)
 # =============================================================================
 # Seasonal cycle
 # =============================================================================
@@ -261,26 +271,36 @@ co_season = seasonal_cycle(co_spatial)
 aod_season = seasonal_cycle(aod_spatial)
 no2_season = seasonal_cycle(no2_spatial)
 methanol_season = seasonal_cycle(methanol_spatial)
+lai_season = seasonal_cycle(lai_spatial)
     
 
-data = [isop_season, methanol_season, hcho_season, aod_season, co_season, no2_season, fire2_season]#fire_season*100, 
+data = [lai_season, fire_season*100, isop_season, methanol_season, hcho_season, co_season, no2_season, aod_season]#fire_season*100, 
 months = np.arange(1, 13)
-labels = ['Isoprene', 'Methanol', 'HCHO', 'AOD', 'CO', 'NO$_{2}$', 'Burned Area GFED5']#'Burned Area GFED4', 
+labels = ['LAI', 'Burned Area', 'Isoprene', 'Methanol', 'HCHO', 'CO', 'NO$_{2}$', 'AOD' ]#'Burned Area GFED4', 
 months_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',\
                  'Oct', 'Nov', 'Dec']
+months_labels2 = ['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov']
 
-
-fig1, ax1 = plt.subplots(figsize=(12, 8))
-for i in range(7):
-    # ax1.plot(months, data[i][:,0]/data[i][:,0].max(), label = f'{labels[i]}')
-    ax1.errorbar(months, data[i][:,0]/data[i][:,0].max(), data[i][:,1]/np.sqrt(data[i][:,2])/data[i][:,0].max(),\
-                  linestyle = '--', capsize = 4, label = f'{labels[i]}')
-ax1.legend(loc='upper left')
-ax1.set_ylabel('Proportion of maximum monthly mean', fontsize = 16)
-ax1.set_xlabel('Month', fontsize = 16)
-ax1.set_xticks(np.arange(1,13, 1))
-ax1.set_xticklabels(months_labels, fontsize = 10)
-
+fontsize = 8
+cm = 1/2.54
+fig1, ax1 = plt.subplots(figsize=(8.3*cm, 6.5*cm))
+for i in range(8):
+    ax1.plot(months, data[i][:,0]/data[i][:,0].max(), lw = 0.7, label = f'{labels[i]}')
+    # ax1.errorbar(months, data[i][:,0]/data[i][:,0].max(), data[i][:,1]/np.sqrt(data[i][:,2])/data[i][:,0].max(),\
+    #               linestyle = '--', capsize = 4, label = f'{labels[i]}')
+    ax1.fill_between(months, data[i][:,0]/data[i][:,0].max()-data[i][:,1]/np.sqrt(data[i][:,2])/data[i][:,0].max(), \
+                     data[i][:,0]/data[i][:,0].max()+data[i][:,1]/np.sqrt(data[i][:,2])/data[i][:,0].max(), alpha = 0.3)
+ax1.legend(loc='upper left', fontsize = fontsize, ncol = 3, framealpha = 0, handlelength = 0.6)
+ax1.set_ylabel('Proportion of max monthly mean', fontsize = fontsize)
+ax1.set_xlabel('Month', fontsize = fontsize)
+ax1.set_xticks(np.arange(1,13, 2))
+ax1.set_yticks(np.arange(0,1.6, 0.5))
+ax1.set_xticklabels(months_labels2, fontsize = fontsize)
+ax1.set_yticklabels(['0', '0.5', '1', '1.5'], fontsize = fontsize)
+fig1.tight_layout()
+# save figure
+# fig1.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f05_vjan2024.pdf')
+# 
 # fig1, ax1 = plt.subplots(figsize=(12, 8))
 # for i in range(6,8):
 #     ax1.plot(months, data[i][:,0], label = f'{labels[i]}')
@@ -292,7 +312,7 @@ ax1.set_xticklabels(months_labels, fontsize = 10)
 # ax1.set_xticks(np.arange(1,13, 1))
 # ax1.set_xticklabels(months_labels, fontsize = 10)
 
-
+# pd.DataFrame(data[-1]).to_csv('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_data_outputs/seasonal_cycle/LAI_month_mean_std.csv')
 # for i in range(7):
 #     pd.DataFrame(data[i]).to_csv(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_data_outputs/seasonal_cycle/{labels[i]}_month_mean_std.csv')
 
@@ -310,7 +330,9 @@ ax1.set_xticklabels(months_labels, fontsize = 10)
 # save figure
 # fig1.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f05_GFED5.png', dpi = 300)
 
-# fig1.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f05_errorbars_GFED5.png', dpi = 300)
+# fig1.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f05_errorbars_GFED4_wLAI.png', dpi = 300)
+
+# fig1.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f05_shading_corrGFED4_wLAI.png', dpi = 300)
 
 
 # =============================================================================

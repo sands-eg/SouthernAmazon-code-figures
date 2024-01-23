@@ -24,6 +24,8 @@ import pandas as pd
 from sklearn.linear_model import TheilSenRegressor
 from matplotlib_scalebar.scalebar import ScaleBar
 from math import radians, sin, cos, acos
+import matplotlib as mpl
+
 
 # hcho
 fn = 'R:/OMI_HCHO/OMI_HCHO_RSCVC_monthly_no_corrections.nc'
@@ -62,6 +64,9 @@ ds = xr.open_dataset(fn, decode_times=True)
 methanol = ds['methanol'][:,:,:]
 ds.close()
 
+stdev = np.std(methanol)
+methanol = methanol.where(methanol < np.nanmean(methanol)+3*stdev, np.nan)
+
 # burned area (GFED 4; 2001-2016); error in metadata - unit is fraction of cell, not %
 fn = 'R:\\gfed\\monthly_1degree_sum_2001-2016.nc'
 ds = xr.open_dataset(fn, decode_times=True)
@@ -69,7 +74,11 @@ fire = ds['Burned area']*100
 fire['time'] = pd.date_range('2001-01-01', '2016-12-31', freq = 'MS')
 ds.close()
 
-
+# burned area GFED5
+fn = 'R:\gfed\GFED5\GFED5_totalBA_2001-2020.nc'
+ds = xr.open_dataset(fn, decode_times=True)
+fire2 = ds['__xarray_dataarray_variable__'].fillna(0)#*100 
+fire2['time'] = pd.date_range('2001-01-01', '2020-12-31', freq = 'MS')
 
 
 
@@ -182,7 +191,7 @@ cell_areas = xr.DataArray(data = surface_area_earth, coords = {"lat": fire.lat, 
 
 crop_areas = crop_data(cell_areas)
 
-
+fire = fire2/cell_areas *100
 # =============================================================================
 # detrend hcho
 # =============================================================================
@@ -276,6 +285,11 @@ methanol_wet_mean = crop_data(weighted_temporal_mean(methanol_wet).mean(axis=0))
 hcho_dry_mean = crop_data(weighted_temporal_mean(hcho_dry_d).mean(axis=0))
 hcho_wet_mean = crop_data(weighted_temporal_mean(hcho_wet_d).mean(axis=0))
 
+# =============================================================================
+# get broadleaf forest mean
+# =============================================================================
+forest_mean = broadleaf.mean(axis=0)
+forest_crop = crop_data(forest_mean)
 # # =============================================================================
 # # display atmospheric composition maps
 # # =============================================================================
@@ -476,24 +490,55 @@ levels2 = np.linspace(vmin2*scaler2, vmax2*scaler2, 11)
 
 # set up figure
 cm = 1/2.54
+# fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 20*cm), subplot_kw={'projection':projection})
+# axes = axes.ravel()
+
+# # first panel (saved as im for colour bar creation)
+# im1 = axes[0].contourf(longitude, latitude, data[0], levels = levels1, cmap = cmap1, extend = 'max', transform=transform)
+# im2 = axes[2].contourf(longitude, latitude, data[2], levels = levels3, cmap = cmap3, extend = 'max', transform=transform)
+# im3 = axes[4].contourf(longitude, latitude, data[4], levels = levels4, cmap = cmap4, extend = 'max', transform=transform) #
+
+# # repeat for other years
+# for i,y in enumerate(data):
+#     axes[i].coastlines()
+#     if i < 2:
+#         axes[i].set_title(subplot_labels[i], fontsize = 10)
+#         axes[i].contourf(longitude, latitude, data[i], levels = levels1, cmap = cmap1, extend = 'max', transform=transform) #levels = levels, 
+#     elif i < 4 and i > 1:
+#         axes[i].contourf(longitude, latitude, data[i], levels = levels3, cmap = cmap3, extend = 'max', transform=transform) 
+#     elif i > 3:
+#         axes[i].contourf(longitude, latitude, data[i], levels = levels4, cmap = cmap4, extend = 'max', transform=transform)
+#     axes[i].set_extent([int(min_lon), int(max_lon), int(min_lat), int(max_lat)], crs = transform)
+#     axes[i].contourf(longitude, latitude, high_elev, levels = levels2, cmap = cmap2, extend = 'max', alpha = 0.7, transform=transform )
+#     gl = axes[i].gridlines(draw_labels=True)
+#     gl.top_labels = False
+#     gl.right_labels = False
+#     gl.xlocator = mticker.FixedLocator([-65, -55])
+#     gl.ylocator = mticker.FixedLocator([-10, -20])
+#     gl.xlabel_style = {'size' : 8}
+#     gl.ylabel_style = {'size' : 8}
+#     axes[i].add_feature(cfeature.BORDERS, zorder=10)
+#     axes[i].text(-73, -7, f'({alphabet[i]})', fontsize = 10)
+
+# set up figure - pixels
 fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 20*cm), subplot_kw={'projection':projection})
 axes = axes.ravel()
 
 # first panel (saved as im for colour bar creation)
-im1 = axes[0].contourf(longitude, latitude, data[0], levels = levels1, cmap = cmap1, extend = 'max', transform=transform)
-im2 = axes[2].contourf(longitude, latitude, data[2], levels = levels3, cmap = cmap3, extend = 'max', transform=transform)
-im3 = axes[4].contourf(longitude, latitude, data[4], levels = levels4, cmap = cmap4, extend = 'max', transform=transform) #
+im1 = axes[0].pcolormesh(longitude, latitude, data[0], cmap = cmap1, transform=transform)
+im2 = axes[2].pcolormesh(longitude, latitude, data[2], cmap = cmap3, transform=transform)
+im3 = axes[4].pcolormesh(longitude, latitude, data[4], cmap = cmap4, transform=transform) #
 
 # repeat for other years
 for i,y in enumerate(data):
     axes[i].coastlines()
     if i < 2:
         axes[i].set_title(subplot_labels[i], fontsize = 10)
-        axes[i].contourf(longitude, latitude, data[i], levels = levels1, cmap = cmap1, extend = 'max', transform=transform) #levels = levels, 
+        axes[i].pcolormesh(longitude, latitude, data[i], cmap = cmap1, transform=transform) #levels = levels, 
     elif i < 4 and i > 1:
-        axes[i].contourf(longitude, latitude, data[i], levels = levels3, cmap = cmap3, extend = 'max', transform=transform) 
+        axes[i].pcolormesh(longitude, latitude, data[i], cmap = cmap3, transform=transform) 
     elif i > 3:
-        axes[i].contourf(longitude, latitude, data[i], levels = levels4, cmap = cmap4, extend = 'max', transform=transform)
+        axes[i].pcolormesh(longitude, latitude, data[i], cmap = cmap4, transform=transform)
     axes[i].set_extent([int(min_lon), int(max_lon), int(min_lat), int(max_lat)], crs = transform)
     axes[i].contourf(longitude, latitude, high_elev, levels = levels2, cmap = cmap2, extend = 'max', alpha = 0.7, transform=transform )
     gl = axes[i].gridlines(draw_labels=True)
@@ -854,3 +899,276 @@ cb3.set_label('(e), (f): Nitrogen dioxide \n(10$^{15}$ molecules cm$^{-2}$)', fo
 
 # save figure
 # fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f04_resized.png', dpi = 300)
+
+
+
+# =============================================================================
+# =============================================================================
+# # pixel versions
+# =============================================================================
+# =============================================================================
+
+
+# =============================================================================
+# f03.png Isoprene, Methanol and Formaldehyde seasonal maps - resized 
+# =============================================================================
+min_lon = -70
+max_lon =  -50 
+min_lat =   -25  
+max_lat = -5 
+
+projection = ccrs.PlateCarree() #ccrs.Robinson() # or ccrs.PlateCarree() for faster drawing?
+transform = ccrs.PlateCarree()
+
+longitude = isop_dry_mean.lon
+latitude = isop_wet_mean.lat
+
+data = [isop_wet_mean/10**16, isop_dry_mean/10**16, methanol_wet_mean, methanol_dry_mean, hcho_wet_mean/10**16, hcho_dry_mean/10**16]
+#, hcho_dry_mean, hcho_wet_mean,\
+#        co_dry_mean, co_wet_mean, aod_dry_mean, aod_wet_mean,\
+#            no2_dry_mean, no2_wet_mean, methanol_dry_mean, methanol_wet_mean]
+subplot_labels = ['Wet season', 'Dry season'] #, 'HCHO', 'HCHO', 'CO', 'CO', 'AOD', 'AOD', 'NO2', 'NO2', 'Methanol', 'Methanol']
+alphabet = ['a', 'b', 'c', 'd', 'e', 'f',]
+# set display parameters
+vmin1 = 0
+vmax1 = 2
+scaler1 = 10**16
+cmap1 = plt.cm.get_cmap('YlOrRd')
+levels1 = np.linspace(vmin1*scaler1, vmax1*scaler1, 11)
+cmap1 = plt.cm.get_cmap('YlOrRd')
+# extract all colors from the  map
+cmaplist = [cmap1(i) for i in range(cmap1.N)]
+# create the new map
+cmap1a = mpl.colors.LinearSegmentedColormap.from_list(
+    'Custom cmap', cmaplist, cmap1.N)
+# define the bins and normalize
+bounds = np.linspace(0, 2, 11)
+norm = mpl.colors.BoundaryNorm(bounds, cmap1.N)
+
+vmin3 = 0
+vmax3 = 1
+scaler3 = 1
+cmap3 = plt.cm.get_cmap('YlOrRd')
+levels3 = np.linspace(vmin3*scaler3, vmax3*scaler3, 11)
+cmaplist = [cmap3(i) for i in range(cmap3.N)]
+# create the new map
+cmap3a = mpl.colors.LinearSegmentedColormap.from_list(
+    'Custom cmap', cmaplist, cmap3.N)
+# define the bins and normalize
+bounds3 = np.linspace(0, 1, 11)
+norm3 = mpl.colors.BoundaryNorm(bounds3, cmap3.N)
+
+vmin4 = 0.5
+vmax4 = 2
+scaler4 = 10**16
+cmap4 = plt.cm.get_cmap('YlOrRd')
+levels4 = np.linspace(vmin4*scaler4, vmax4*scaler4, 15)
+cmaplist = [cmap4(i) for i in range(cmap4.N)]
+# create the new map
+cmap4a = mpl.colors.LinearSegmentedColormap.from_list(
+    'Custom cmap', cmaplist, cmap4.N)
+# define the bins and normalize
+bounds4 = np.linspace(vmin4, 2, 16)
+norm4 = mpl.colors.BoundaryNorm(bounds4, cmap4.N)
+
+vmin2 = 0
+vmax2 = 1000
+scaler2 = 1
+cmap2 = plt.cm.get_cmap('Greys')
+levels2 = np.linspace(vmin2*scaler2, vmax2*scaler2, 11)
+
+# set up figure
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 14*cm), subplot_kw={'projection':projection})
+axes = axes.ravel()
+
+# first panel (saved as im for colour bar creation)
+im1 = axes[0].pcolormesh(longitude, latitude, data[0], vmin = vmin1, vmax = vmax1, cmap = cmap1a, norm = norm, transform=transform)
+im2 = axes[2].pcolormesh(longitude, latitude, data[2], vmin = vmin3, vmax = vmax3, cmap = cmap3a, norm = norm3, transform=transform)
+im3 = axes[4].pcolormesh(longitude, latitude, data[4], vmin = vmin4, vmax = vmax4, cmap = cmap4a, norm = norm4, transform=transform) #
+
+# repeat for other years
+for i,y in enumerate(data):
+    axes[i].coastlines()
+    if i < 2:
+        axes[i].set_title(subplot_labels[i], fontsize = 8)
+        axes[i].pcolormesh(longitude, latitude, data[i], vmin = vmin1, vmax = vmax1, cmap = cmap1a, norm = norm, transform=transform) #vmin = vmin, vmax = vmax, 
+    elif i < 4 and i > 1:
+        axes[i].pcolormesh(longitude, latitude, data[i], vmin = vmin3, vmax = vmax3, cmap = cmap3a, norm = norm3, transform=transform) 
+    elif i > 3:
+        axes[i].pcolormesh(longitude, latitude, data[i], vmin = vmin4, vmax = vmax4, cmap = cmap4a, norm = norm4, transform=transform)
+    axes[i].set_extent([int(min_lon), int(max_lon), int(min_lat), int(max_lat)], crs = transform)
+    axes[i].contourf(longitude, latitude, high_elev, levels = levels2, cmap = cmap2, extend = 'max', alpha = 0.7, transform=transform )
+    # axes[i].contour(longitude, latitude, forest_crop, levels = np.linspace(0.51, 1, 2), cmap='Blues_r', \
+    #                 alpha = 0.5, transform=transform )
+    gl = axes[i].gridlines(draw_labels=True)
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlocator = mticker.FixedLocator([-65, -55])
+    gl.ylocator = mticker.FixedLocator([-10, -20])
+    gl.xlabel_style = {'size' : 7}
+    gl.ylabel_style = {'size' : 7}
+    axes[i].add_feature(cfeature.BORDERS, zorder=10)
+    axes[i].text(-73, -7, f'({alphabet[i]})', fontsize = 8)
+
+
+# scalebar = ScaleBar(dx, box_alpha=0.6)#, location = 'lower right', box_color='white') #units = 'deg', dimension = 'angle')
+# plt.gca().add_artist(scalebar)
+    
+# set title and layout
+# fig.suptitle('Mean cover %', fontsize = 16)
+fig.tight_layout()
+fig.subplots_adjust(right=0.8)
+
+# add colorbars
+cax1 = fig.add_axes([0.8, 0.68, 0.02, 0.25])
+cb1 = fig.colorbar(im1, cax=cax1, orientation='vertical')
+cb1.ax.tick_params(labelsize=7)
+cb1.set_label('Isoprene \n(10$^{16}$ molecules cm$^{-2}$)', fontsize = 7)
+
+cax2 = fig.add_axes([0.8, 0.37, 0.02, 0.25])
+cb2 = fig.colorbar(im2, cax=cax2, orientation='vertical')
+cb2.ax.tick_params(labelsize=7)
+cb2.set_label('Methanol (ppbv)', fontsize = 7)
+
+cax3 = fig.add_axes([0.8, 0.05, 0.02, 0.25])
+cb3 = fig.colorbar(im3, cax=cax3, orientation='vertical', ticks=np.arange(0.5, 2.1, 0.5))
+cb3.ax.tick_params(labelsize=7)
+cb3.set_label('(Formaldehyde \n(10$^{16}$ molecules cm$^{-2}$)', fontsize = 7)
+
+# save figure
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/biogenic_pcolormesh_vjan2024.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/biogenic_pcolormesh_vjan2024.pdf')
+
+# =============================================================================
+# f04.png Carbon monoxide, AOD, NO2 seasonal maps - resized
+# =============================================================================
+min_lon = -70
+max_lon =  -50 
+min_lat =   -25  
+max_lat = -5 
+
+projection = ccrs.PlateCarree() #ccrs.Robinson() # or ccrs.PlateCarree() for faster drawing?
+transform = ccrs.PlateCarree()
+
+longitude = co_dry_mean.lon
+latitude = co_wet_mean.lat
+
+data = [co_wet_mean, co_dry_mean, aod_wet_mean, aod_dry_mean, no2_wet_mean/10**15, no2_dry_mean/10**15]
+#, hcho_dry_mean, hcho_wet_mean,\
+#        co_dry_mean, co_wet_mean, aod_dry_mean, aod_wet_mean,\
+#            no2_dry_mean, no2_wet_mean, methanol_dry_mean, methanol_wet_mean]
+subplot_labels = ['Wet season', 'Dry season'] #, 'HCHO', 'HCHO', 'CO', 'CO', 'AOD', 'AOD', 'NO2', 'NO2', 'Methanol', 'Methanol']
+alphabet = ['a', 'b', 'c', 'd', 'e', 'f',]
+# set display parameters
+vmin1 = 10
+vmax1 = 36
+
+cmap1 = plt.cm.get_cmap('YlOrRd')
+# extract all colors from the  map
+cmaplist = [cmap1(i) for i in range(cmap1.N)]
+# create the new map
+cmap1a = mpl.colors.LinearSegmentedColormap.from_list(
+    'Custom cmap', cmaplist, cmap1.N)
+# define the bins and normalize
+bounds = np.linspace(vmin1, vmax1, 14)
+norm = mpl.colors.BoundaryNorm(bounds, cmap1.N)
+
+vmin3 = 0
+vmax3 = 0.9
+scaler3 = 1
+cmap3 = plt.cm.get_cmap('YlOrRd')
+levels3 = np.linspace(vmin3*scaler3, vmax3*scaler3, 11)
+cmaplist = [cmap3(i) for i in range(cmap3.N)]
+# create the new map
+cmap3a = mpl.colors.LinearSegmentedColormap.from_list(
+    'Custom cmap', cmaplist, cmap3.N)
+# define the bins and normalize
+bounds3 = np.linspace(0, vmax3, 10)
+norm3 = mpl.colors.BoundaryNorm(bounds3, cmap3.N)
+
+vmin4 = 0
+vmax4 = 3
+scaler4 = 10**15
+cmap4 = plt.cm.get_cmap('YlOrRd')
+levels4 = np.linspace(vmin4*scaler4, vmax4*scaler4, 11)
+cmaplist = [cmap4(i) for i in range(cmap4.N)]
+# create the new map
+cmap4a = mpl.colors.LinearSegmentedColormap.from_list(
+    'Custom cmap', cmaplist, cmap4.N)
+# define the bins and normalize
+bounds4 = np.linspace(0, 3, 11)
+norm4 = mpl.colors.BoundaryNorm(bounds4, cmap4.N)
+
+vmin2 = 0
+vmax2 = 1000
+scaler2 = 1
+cmap2 = plt.cm.get_cmap('Greys')
+levels2 = np.linspace(vmin2*scaler2, vmax2*scaler2, 11)
+
+# set up figure
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 14*cm), subplot_kw={'projection':projection})
+axes = axes.ravel()
+
+# first panel (saved as im for colour bar creation)
+im1 = axes[0].pcolormesh(longitude, latitude, data[0], vmin = vmin1, vmax = vmax1, cmap = cmap1a, norm = norm, transform=transform)
+im2 = axes[2].pcolormesh(longitude, latitude, data[2], vmin = vmin3, vmax = vmax3, cmap = cmap3a, norm = norm3, transform=transform)
+im3 = axes[4].pcolormesh(longitude, latitude, data[4], vmin = vmin4, vmax = vmax4, cmap = cmap4a, norm = norm4, transform=transform) #
+
+# repeat for other years
+for i,y in enumerate(data):
+    axes[i].coastlines()
+    if i < 2:
+        axes[i].set_title(subplot_labels[i], fontsize = 8)
+        axes[i].pcolormesh(longitude, latitude, data[i], vmin = vmin1, vmax = vmax1, cmap = cmap1a, norm = norm, transform=transform) #vmin = vmin, vmax = vmax, 
+    elif i < 4 and i > 1:
+        axes[i].pcolormesh(longitude, latitude, data[i], vmin = vmin3, vmax = vmax3, cmap = cmap3a, norm = norm3, transform=transform) 
+    elif i > 3:
+        axes[i].pcolormesh(longitude, latitude, data[i], vmin = vmin4, vmax = vmax4, cmap = cmap4a, norm = norm4, transform=transform)
+    axes[i].set_extent([int(min_lon), int(max_lon), int(min_lat), int(max_lat)], crs = transform)
+    axes[i].contourf(longitude, latitude, high_elev, levels = levels2, cmap = cmap2, extend = 'max', alpha = 0.7, transform=transform )
+    # axes[i].contour(longitude, latitude, forest_crop, levels = np.linspace(0.51, 1, 2), cmap = 'Blues_r', \
+    #                 alpha = 0.5, transform=transform )
+    # cs = axes[i].contourf(longitude, latitude, forest_crop, levels = np.linspace(0.51, 1, 2), colors = 'none', \
+    #                 hatches=['//'], alpha = 0, transform=transform )   # hatches=['-', '/', '\\', '//']
+    # cs.collections[0].set_edgecolor('forestgreen')
+    # cs.collections[0].set_linewidth(0.)
+    gl = axes[i].gridlines(draw_labels=True)
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlocator = mticker.FixedLocator([-65, -55])
+    gl.ylocator = mticker.FixedLocator([-10, -20])
+    gl.xlabel_style = {'size' : 7}
+    gl.ylabel_style = {'size' : 7}
+    axes[i].add_feature(cfeature.BORDERS, zorder=10)
+    axes[i].text(-73, -7, f'({alphabet[i]})', fontsize = 8)
+
+
+# scalebar = ScaleBar(dx, box_alpha=0.6)#, location = 'lower right', box_color='white') #units = 'deg', dimension = 'angle')
+# plt.gca().add_artist(scalebar)
+    
+# set title and layout
+# fig.suptitle('Mean cover %', fontsize = 16)
+fig.tight_layout()
+fig.subplots_adjust(right=0.8)
+
+# add colorbars
+cax1 = fig.add_axes([0.8, 0.68, 0.02, 0.25])
+cb1 = fig.colorbar(im1, cax=cax1, orientation='vertical')
+cb1.ax.tick_params(labelsize=8)
+cb1.set_label('Carbon monoxide \n(10$^{17}$ molecules cm$^{-2}$)', fontsize = 7)
+
+cax2 = fig.add_axes([0.8, 0.37, 0.02, 0.25])
+cb2 = fig.colorbar(im2, cax=cax2, orientation='vertical', ticks=np.arange(0, 1, 0.3))
+cb2.ax.tick_params(labelsize=8)
+cb2.set_label('Aerosol optical depth \nat 0.47 $\mu$m', fontsize = 7)
+
+cax3 = fig.add_axes([0.8, 0.05, 0.02, 0.25])
+cb3 = fig.colorbar(im3, cax=cax3, orientation='vertical')
+cb3.ax.tick_params(labelsize=8)
+cb3.set_label('Nitrogen dioxide \n(10$^{15}$ molecules cm$^{-2}$)', fontsize = 7)
+
+# save figure
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/pyrogenic_pcolormesh_wforest_cmaptest.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/pyrogenic_pcolormesh_vjan2024.pdf')

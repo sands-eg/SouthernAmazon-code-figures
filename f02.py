@@ -21,7 +21,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.ticker as mticker
 import pandas as pd
-from sklearn.linear_model import TheilSenRegressor
+# from sklearn.linear_model import TheilSenRegressor
 from matplotlib_scalebar.scalebar import ScaleBar
 from math import radians, sin, cos, acos
 
@@ -69,6 +69,38 @@ fire = ds['Burned area']*100
 fire['time'] = pd.date_range('2001-01-01', '2016-12-31', freq = 'MS')
 ds.close()
 
+# burned area GFED5
+fn = 'R:\gfed\GFED5\GFED5_totalBA_2001-2020.nc'
+ds = xr.open_dataset(fn, decode_times=True)
+fire2 = ds['__xarray_dataarray_variable__'].fillna(0)
+fire2['time'] = pd.date_range('2001-01-01', '2020-12-31', freq = 'MS')
+
+ds.close()
+
+
+# grid cell area
+lon_edges = np.arange(-180, 180.1, 1)
+lat_edges = np.arange(90, -90.1, -1)
+# initialise variables
+n_lons = len(lon_edges) - 1 # len() works for 1D arrays
+n_lats = len(lat_edges) - 1 
+R = 6371.0 # the radius of Earth in km
+mdi = -999.99 # no data value
+surface_area_earth = np.zeros((n_lats, n_lons)) + mdi
+# get lat and lon in radians
+lons_rad = lon_edges*(2*np.pi/360.0)
+lats_rad = lat_edges*(2*np.pi/360.0)
+# calculate surface area for lon lat grid 
+# surface area = -1 * R^2 * (lon2 - lon1) * (sin(lat2) - sin(lat1)) # lat and lon in radians
+for i in range(n_lons):
+    for j in range(n_lats):
+        term1 = R**2
+        term2 = (lons_rad[i+1] - lons_rad[i])
+        term3 = np.sin(lats_rad[j+1]) - np.sin(lats_rad[j])
+        
+        tmp_sa = -1*term1*term2*term3 # without -1 surface area comes out negative (lat in different order for MODIS?)
+        surface_area_earth[j, i] = tmp_sa
+fire2 = fire2.fillna(0)/surface_area_earth *100
 ### land cover
 # fn = 'R:\modis_lc\mcd12c1_1deg_igbp_percent_corrected.nc'
 # ds = xr.open_dataset(fn, decode_times=True)
@@ -455,8 +487,13 @@ cb2.set_label(f'% {labels[2]}', fontsize = 12)
 # fire_wet = get_month_data([2,3,4], fire_slice)
 # fire_dry = get_month_data([8,9,10], fire_slice) 
 
-fire_wet = get_month_data([2,3,4], fire)
-fire_dry = get_month_data([8,9,10], fire)
+# fire_wet = get_month_data([2,3,4], fire)
+# fire_dry = get_month_data([8,9,10], fire)
+# fire_dry_mean = crop_data(weighted_temporal_mean(fire_dry).mean(axis=0))
+# fire_wet_mean = crop_data(weighted_temporal_mean(fire_wet).mean(axis=0))
+
+fire_wet = get_month_data([2,3,4], fire2)
+fire_dry = get_month_data([8,9,10], fire2)
 fire_dry_mean = crop_data(weighted_temporal_mean(fire_dry).mean(axis=0))
 fire_wet_mean = crop_data(weighted_temporal_mean(fire_wet).mean(axis=0))
 
@@ -480,8 +517,8 @@ labels = ['Wet season', 'Dry season']
 
 # set display parameters
 vmin = 0
-vmax = 0.02
-scaler = 100
+vmax = 0.3
+scaler = 1
 cmap1 = plt.cm.get_cmap('Oranges')
 levels = np.linspace(vmin*scaler, vmax*scaler, 21)
 alpha = 1
@@ -517,7 +554,9 @@ fig.tight_layout()
 # cb = fig.colorbar(im0, cax=cax, orientation='vertical')
 cax = fig.add_axes([0.1, 0.07, 0.8, 0.02])
 cb = fig.colorbar(im, cax=cax, orientation='horizontal')
-cb.set_label('Mean monthly burned area [10$^{2}$ % grid cell area]', fontsize = 12)
+# cb.set_label('Mean monthly burned area [10$^{2}$ % grid cell area]', fontsize = 12)
+
+cb.set_label('GFED5 mean monthly burned area [% grid cell area]', fontsize = 12)
 
 # save figure
 # fig.savefig('.png', dpi = 300)
@@ -567,7 +606,7 @@ labels = ['Wet season', 'Dry season']
 
 # set display parameters
 vmin = 0
-vmax = 600
+vmax = 1000
 scaler = 1
 cmap1 = plt.cm.get_cmap('Oranges')
 levels = np.linspace(vmin*scaler, vmax*scaler, 25)
@@ -644,8 +683,8 @@ cmap3 = plt.cm.get_cmap('gist_earth')
 levels3 = np.linspace(vmin3*scaler3, vmax3*scaler3, 21)
 
 vmin4 = 0
-vmax4 = 0.02
-scaler4 = 100
+vmax4 = 0.2
+scaler4 = 1
 cmap4 = plt.cm.get_cmap('Oranges')
 levels4 = np.linspace(vmin4*scaler4, vmax4*scaler4, 21)
 
@@ -700,7 +739,10 @@ cb3.ax.tick_params(labelsize=8)
 
 cb.set_label('Land type (% grid cell cover, subplots a, b)', fontsize = 8)
 cb2.set_label('Elevation (m a.s.l., subplot c)', fontsize = 8)
-cb3.set_label('Dry season burned area (10$^{2}$ x % grid cell area, subplot d)', fontsize = 8)
+# cb3.set_label('Dry season burned area (10$^{2}$ x % grid cell area, subplot d)', fontsize = 8)
+cb3.set_label('Dry season burned area (% grid cell area, subplot d)', fontsize = 8)
+
 # save figure
 # fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f02_4panel.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f02_GFED5.png', dpi = 300)
 

@@ -203,24 +203,31 @@ fire_regional = fire_sum.sum(axis=(1,2))
 # =============================================================================
 year = np.arange(2001, 2020)
 
-fig, ax = plt.subplots(figsize=(13,9))
+cm = 1/2.54
+fontsize = 8
+fig, ax = plt.subplots(figsize=(8.3*cm,7*cm))
 
 ax.plot(year, broadleaf_regional*100, color = 'blue', label = 'Broadleaf')
 ax2 = ax.twinx()
-ax2.plot(year, grass_regional*100, color = 'orange', label = 'Grasslands')
-ax2.plot(year, savanna_regional*100, color = 'maroon', label = 'Savanna')
+ax2.plot(year, savanna_regional*100, color = 'orange', label = 'Savanna')
+ax2.plot(year, grass_regional*100, color = 'maroon', label = 'Grasslands')
 
-year_ticks = np.arange(2001, 2020,2)
+
+year_ticks = np.arange(2001, 2020,4)
 ax.set_xticks(year_ticks)
-ax.set_ylabel('Broadleaf [%]', fontsize = 16)
-ax2.set_ylabel('Grassland or Savanna [%]', fontsize = 16)
-ax.set_xlabel('Year', fontsize = 16)
-fig.legend(fontsize = 14, loc = 'center right', bbox_to_anchor=(0.4, 0.3, 0.5, 0.5))
-
+ax.set_xticklabels(year_ticks, fontsize = fontsize)
+ax.set_ylabel('Broadleaf [%]', fontsize = fontsize)
+ax.set_yticks(np.arange(48, 53, 1))
+ax.set_yticklabels(np.arange(48, 53, 1), fontsize = fontsize)
+ax2.set_ylabel('Savanna or Grassland [%]', fontsize = fontsize)
+ax2.set_yticks(np.arange(18, 31, 2))
+ax2.set_yticklabels(np.arange(18, 31, 2), fontsize = fontsize)
+ax.set_xlabel('Year', fontsize = fontsize)
+fig.legend(fontsize = fontsize, loc = 'center right', bbox_to_anchor=(0.3, 0.4, 0.5, 0.5))
+fig.tight_layout()
 
 # save figure
-# fig.savefig(f'M:/figures/atm_chem/comparison/SouthAmazon_stats/MonteCarlo/{labels[atmos_no]}_{lc_label}_lineandbootstrap_noneabove{elev_boundary}.png', dpi = 300)
-
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/land_cover_change.pdf')
 
 year = np.arange(2001, 2017)
 

@@ -13,15 +13,21 @@ import numpy.ma as ma
 from sklearn.linear_model import TheilSenRegressor
 import statsmodels.api as sm
 from scipy.stats import spearmanr
+import matplotlib as mpl
 
 # =============================================================================
 # load data
 # =============================================================================
 
 # burned area (GFED 4; 2001-2016); error in metadata - unit is fraction of cell, not %
-fn = 'R:\\gfed\\monthly_1degree_sum_2001-2016.nc'
+# fn = 'R:\\gfed\\monthly_1degree_sum_2001-2016.nc'
+# ds = xr.open_dataset(fn, decode_times=True)
+# fire = ds['Burned area']*100 
+# fire['time'] = pd.date_range('2001-01-01', '2016-12-31', freq = 'MS')
+# ds.close()
+fn = 'R:\\gfed\\GFED4_BAkm2_2001-2016.nc'
 ds = xr.open_dataset(fn, decode_times=True)
-fire = ds['Burned area']*100 
+fire = ds['Burned Area']
 fire['time'] = pd.date_range('2001-01-01', '2016-12-31', freq = 'MS')
 ds.close()
 ## DEM
@@ -260,12 +266,12 @@ for i in range(n_lons):
 spatial_weights = surface_area_earth / np.max(surface_area_earth)
 
 spatial_weights = xr.DataArray(data = spatial_weights, coords = {"lat": fire.lat, "lon": fire.lon})
-
+fire1 = fire.fillna(0)/surface_area_earth *100
 # =============================================================================
 # crop data to region of interest
 # =============================================================================
 
-fire_crop = crop_data(fire)
+fire_crop = crop_data(fire1)
 lai_crop = crop_data(lai)
 broadleaf_crop = crop_data(broadleaf)
 dem_crop = crop_data(dem)
@@ -380,7 +386,7 @@ else:
 
 labels = {1 : 'Isoprene', 2 : 'AOD' , 3 : 'Methanol', 4 : 'NO$_{2}$', 5 : 'CO', 6 : 'HCHO'}
 
-units = {1 : '[molecules cm$^{-2}$]', 2 : 'at 0.47 $\mu$m', 3 : '[ppbv]', 4 : '[molecules cm$^{-2}$]',\
+units = {1 : '10$^{16}$ molecules cm$^{-2}$', 2 : 'at 0.47 $\mu$m', 3 : '[ppbv]', 4 : '[molecules cm$^{-2}$]',\
          5 : '[10$^{17}$ molecules cm$^{-2}$]', 6 : '[molecules cm$^{-2}$]'}
 
 
@@ -435,9 +441,27 @@ for i, y in enumerate(lcs):
     for a in range(lai_slice.shape[0]):
         for b in range(3):
             reshape_lai[a*3+b,:,:] = lai_slice[a]
-
 # =============================================================================
-# Create dataframe
+# get lat and lon as separate arrays
+# =============================================================================
+
+lat_array = np.zeros((20,20))
+for i in range(20):
+    lat_array[:,i] = atmos_dry_slice.lat[:]
+
+lon_array = np.zeros((20,20))
+for i in range(20):
+    lon_array[i,:] = atmos_dry_slice.lon[:]
+
+reshape_lat = np.zeros_like(atmos_dry_slice)
+for a in range(reshape_lat.shape[0]):
+    reshape_lat[a,:,:] = lat_array[:,:]
+
+reshape_lon = np.zeros_like(atmos_dry_slice)
+for a in range(reshape_lon.shape[0]):
+    reshape_lon[a,:,:] = lon_array[:,:]
+# =============================================================================
+# Create dataframe - create 1 D lat and lon variables
 # =============================================================================
 atmos_wet_1d = atmos_wet_slice.values.ravel()
 atmos_dry_1d = atmos_dry_slice.values.ravel()
@@ -448,21 +472,772 @@ lai_1d = reshape_lai.ravel()
 lc_1d = reshape_lc.ravel()
 
 fire_1d = fire_slice.values.ravel()
-# fire_1d = fire_wet_slice.values.ravel()
+fire_wet_1d = fire_wet_slice.values.ravel()
+lat_1d = reshape_lat.ravel()
+lon_1d = reshape_lon.ravel()
 
 # plt.scatter(lai_1d, atmos_dry_1d)
 # plt.scatter(lc_1d, atmos_dry_1d)
 # plt.scatter(fire_1d, atmos_dry_1d)
 
 ### create pandas dataframe to hold data of interest
+# for_export = {'Atmos': atmos_dry_1d, 'Fire': fire_1d}
+# data_export = pd.DataFrame(for_export)
+# np.savetxt('C:/Users/s2261807/Documents/no2_burned_area.txt', data_export.values)
 
-data = {'Atmos': atmos_dry_1d, 'LC': lc_1d, 'LAI': lai_1d, 'Fire': fire_1d} #, 'expFire': np.exp(fire_1d)}
+data_log = {'Atmos': atmos_dry_1d, 'LC': lc_1d, 'LAI': lai_1d, 'Fire': fire_1d, \
+        'Atmos_log': np.log(atmos_dry_1d), 'Fire_log': np.log(fire_1d)}#, 'Atmos_sqrt': np.sqrt(atmos_dry_1d),\
+            # 'Fire_sqrt': np.sqrt(fire_1d), 'Lat' : lat_1d, 'Lon' : lon_1d} #, 'expFire': np.exp(fire_1d)}
 
-data_pd = pd.DataFrame(data).dropna()
+data = {'Atmos': atmos_dry_1d, 'Atmos_wet': atmos_wet_1d, 'LC': lc_1d, 'LAI': lai_1d,\
+        'Fire': fire_1d, 'Fire_wet': fire_wet_1d, 'Lat' : lat_1d, 'Lon' : lon_1d}
+    
+
+data_pd = pd.DataFrame(data).replace(-np.Inf, np.nan).dropna()
+data_log_pd = pd.DataFrame(data_log).replace(-np.Inf, np.nan).dropna()
+
+
 
 print(spearmanr(data_pd['Atmos'], data_pd['LC']))
 print(spearmanr(data_pd['Atmos'], data_pd['LAI']))
 print(spearmanr(data_pd['Atmos'], data_pd['Fire']))
+print(spearmanr(data_log_pd['Atmos_log'], data_log_pd['Fire_log']))
+
+### OLS
+# Xi = data_pd['LC']
+# Xi = data_pd['LAI']
+# Xi = data_pd['Fire']
+Xi = data_log_pd['Fire_log']
+# Xi = data_pd[['LC', 'Fire']]
+# Xi = data_pd[['Fire', 'LAI']]
+# y = data_pd['Atmos']
+y = data_log_pd['Atmos_log']
+X = sm.add_constant(Xi)
+mod = sm.OLS(y, X)
+res = mod.fit()
+
+print(res.summary())
+
+
+### TS
+reg = TheilSenRegressor().fit(X, y)
+score = reg.score(X, y)
+print(score)
+# =============================================================================
+# NO2 figure - points coloured based on lai and lc
+# =============================================================================
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18*cm, 14*cm))
+axes = axes.ravel()
+cmap = plt.cm.get_cmap('viridis')
+# cmap = plt.cm.get_cmap('coolwarm')
+cmaplist = [cmap(i) for i in range(cmap.N)]
+# create the new map
+cmap = mpl.colors.LinearSegmentedColormap.from_list(
+    'Custom cmap', cmaplist, cmap.N)
+# define the bins and normalize
+bounds2 = np.linspace(0, 100, 11)
+norm2 = mpl.colors.BoundaryNorm(bounds2, cmap.N)
+bounds1 = np.linspace(0, 6, 7)
+norm1 = mpl.colors.BoundaryNorm(bounds1, cmap.N)
+bounds3 = np.linspace(-25, -5, 11)
+norm3 = mpl.colors.BoundaryNorm(bounds3, cmap.N)
+bounds4 = np.linspace(-70, -50, 11)
+norm4 = mpl.colors.BoundaryNorm(bounds4, cmap.N)
+
+a = axes[0].scatter(data_pd['Fire'], data_pd['Atmos']/10**16, s=2, c=data_pd['LC'], cmap=cmap, norm=norm2)
+fig.colorbar(a,ax=axes[0],orientation='vertical',label='Forest Cover')
+fig.text(0.02, 0.95, '(a)', fontsize = 10)
+
+b = axes[1].scatter(data_pd['Fire'], data_pd['Atmos']/10**16, s=2, c=data_pd['LAI']/10, cmap=cmap, norm=norm1)
+fig.colorbar(b,ax=axes[1],orientation='vertical',label='LAI')
+fig.text(0.51, 0.95, '(b)', fontsize = 10)
+
+c = axes[2].scatter(data_pd['Fire'], data_pd['Atmos']/10**16, s=2, c=data_pd['Lat'], cmap=cmap, norm=norm3)
+fig.colorbar(c,ax=axes[2],orientation='vertical',label='Latitude')
+fig.text(0.02, 0.46, '(c)', fontsize = 10)
+
+d = axes[3].scatter(data_pd['Fire'], data_pd['Atmos']/10**16, s=2, c=data_pd['Lon'], cmap=cmap, norm=norm4)
+fig.colorbar(d,ax=axes[3],orientation='vertical',label='Longitude')
+fig.text(0.51, 0.46, '(d)', fontsize = 10)
+for i in range(4):
+    axes[i].set_ylabel('NO$_{2}$ [10$^{16}$ mol cm$^{-2}$]', size = 10)
+    axes[i].set_xlabel('Burned area [% grid cell area]', size = 10)
+    axes[i].set_xlim([0, 2])
+    axes[i].set_ylim([0,1.5])
+    axes[i].set_yticks(np.arange(0, 1.6, 0.5))
+
+fig.tight_layout()
+
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/no2_dry_season_coloured_scatter.pdf')
+# fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/no2_dry_season_coloured_scatter.png', dpi = 300)
+
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18*cm, 14*cm))
+axes = axes.ravel()
+
+a = axes[0].scatter(data_pd['Fire_log'], data_pd['Atmos_log'], s=2, c=data_pd['LAI']/10, cmap='YlGnBu')
+fig.colorbar(a,ax=axes[0],orientation='vertical',label='LAI')
+
+b = axes[1].scatter(data_pd['Fire_log'], data_pd['Atmos_log'], s=2, c=data_pd['LC'], cmap='YlGnBu')
+fig.colorbar(b,ax=axes[1],orientation='vertical',label='Forest Cover')
+c = axes[2].scatter(data_pd['Fire_log'], data_pd['Atmos_log'], s=2, c=data_pd['Lat'], cmap='YlGnBu')
+fig.colorbar(c,ax=axes[2],orientation='vertical',label='Latitude')
+d = axes[3].scatter(data_pd['Fire_log'], data_pd['Atmos_log'], s=2, c=data_pd['Lon'], cmap='YlGnBu')
+fig.colorbar(d,ax=axes[3],orientation='vertical',label='Longitude')
+for i in range(4):
+    axes[i].set_ylabel(f'Nat log of {labels[atmos_no]} {units[atmos_no]}', size = 10)
+    axes[i].set_xlabel('Nat log of burned area \n[% grid cell area]', size = 10)
+fig.tight_layout()
+
+# fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/log{labels[atmos_no]}_dry_season_coloured_scatter.png', dpi = 300)
+# 
+
+### focusing on specific forest covers
+forest75_pd = data_pd[data_pd['LC'] > 75]
+forest50_pd = data_pd[data_pd['LC'] <= 75][data_pd['LC'] > 50]
+forest25_pd = data_pd[data_pd['LC'] <= 50][data_pd['LC'] > 25]
+forest0_pd = data_pd[data_pd['LC'] <= 25]
+
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18*cm, 14*cm))
+axes = axes.ravel()
+
+a = axes[0].scatter(forest75_pd['Fire'], forest75_pd['Atmos'], s=2, c=forest75_pd['LC'], cmap='YlGnBu')
+fig.colorbar(a,ax=axes[0],orientation='vertical',label='Forest Cover')
+b = axes[1].scatter(forest50_pd['Fire'], forest50_pd['Atmos'], s=2, c=forest50_pd['LC'], cmap='YlGnBu')
+fig.colorbar(b,ax=axes[1],orientation='vertical',label='Forest Cover')
+c = axes[2].scatter(forest25_pd['Fire'], forest25_pd['Atmos'], s=2, c=forest25_pd['LC'], cmap='YlGnBu')
+fig.colorbar(c,ax=axes[2],orientation='vertical',label='Forest Cover')
+d = axes[3].scatter(forest0_pd['Fire'], forest0_pd['Atmos'], s=2, c=forest0_pd['LC'], cmap='YlGnBu')
+fig.colorbar(d,ax=axes[3],orientation='vertical',label='Forest Cover')
+for i in range(4):
+    axes[i].set_ylabel(f'{labels[atmos_no]} {units[atmos_no]}', size = 10)
+    axes[i].set_xlabel('Burned area [% grid cell area]', size = 10)
+    axes[i].set_xlim([0,0.5])
+    axes[i].set_ylim([0,1.6 * 10**16])
+# axes[0].set_xlim([0,0.02])
+fig.tight_layout()
+
+# fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/{labels[atmos_no]}_dry_season_forest_dependency_corrGFED4.png', dpi = 300)
+
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18*cm, 14*cm))
+axes = axes.ravel()
+
+a = axes[0].scatter(forest75_pd['Fire_log'], forest75_pd['Atmos_log'], s=2, c=forest75_pd['LC'], cmap='YlGnBu')
+fig.colorbar(a,ax=axes[0],orientation='vertical',label='Forest Cover')
+b = axes[1].scatter(forest50_pd['Fire_log'], forest50_pd['Atmos_log'], s=2, c=forest50_pd['LC'], cmap='YlGnBu')
+fig.colorbar(b,ax=axes[1],orientation='vertical',label='Forest Cover')
+c = axes[2].scatter(forest25_pd['Fire_log'], forest25_pd['Atmos_log'], s=2, c=forest25_pd['LC'], cmap='YlGnBu')
+fig.colorbar(c,ax=axes[2],orientation='vertical',label='Forest Cover')
+d = axes[3].scatter(forest0_pd['Fire_log'], forest0_pd['Atmos_log'], s=2, c=forest0_pd['LC'], cmap='YlGnBu')
+fig.colorbar(d,ax=axes[3],orientation='vertical',label='Forest Cover')
+for i in range(4):
+    axes[i].set_ylabel(f'Log {labels[atmos_no]} {units[atmos_no]}', size = 10)
+    axes[i].set_xlabel('Log Burned area [% grid cell area]', size = 10)
+    axes[i].set_xlim([-10, -2.5])
+    axes[i].set_ylim([33, 38])
+fig.tight_layout()
+
+# fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/log{labels[atmos_no]}_dry_season_forest_dependency.png', dpi = 300)
+# cm = 1/2.54
+# fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18*cm, 14*cm))
+# axes = axes.ravel()
+
+# a = axes[0].scatter(data_pd['Fire_wet'], data_pd['Atmos'], s=2, c=data_pd['LAI']/10, cmap='YlGnBu')
+# fig.colorbar(a,ax=axes[0],orientation='vertical',label='LAI')
+
+# b = axes[1].scatter(data_pd['Fire_wet'], data_pd['Atmos'], s=2, c=data_pd['LC'], cmap='YlGnBu')
+# fig.colorbar(b,ax=axes[1],orientation='vertical',label='Forest Cover')
+# c = axes[2].scatter(data_pd['Fire_wet'], data_pd['Atmos'], s=2, c=data_pd['Lat'], cmap='YlGnBu')
+# fig.colorbar(c,ax=axes[2],orientation='vertical',label='Latitude')
+# d = axes[3].scatter(data_pd['Fire_wet'], data_pd['Atmos'], s=2, c=data_pd['Lon'], cmap='YlGnBu')
+# fig.colorbar(d,ax=axes[3],orientation='vertical',label='Longitude')
+# for i in range(4):
+#     axes[i].set_ylabel(f'{labels[atmos_no]} {units[atmos_no]}', size = 10)
+#     axes[i].set_xlabel('Burned area [% grid cell area]', size = 10)
+    
+# fig.tight_layout()
+
+# # fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/{labels[atmos_no]}_dry_season_coloured_scatter.png', dpi = 300)
+
+# cm = 1/2.54
+# fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18*cm, 14*cm))
+# axes = axes.ravel()
+
+# a = axes[0].scatter(data_pd['Fire_wet_log'], data_pd['Atmos_log'], s=2, c=data_pd['LAI']/10, cmap='YlGnBu')
+# fig.colorbar(a,ax=axes[0],orientation='vertical',label='LAI')
+
+# b = axes[1].scatter(data_pd['Fire_wet_log'], data_pd['Atmos_log'], s=2, c=data_pd['LC'], cmap='YlGnBu')
+# fig.colorbar(b,ax=axes[1],orientation='vertical',label='Forest Cover')
+# c = axes[2].scatter(data_pd['Fire_wet_log'], data_pd['Atmos_log'], s=2, c=data_pd['Lat'], cmap='YlGnBu')
+# fig.colorbar(c,ax=axes[2],orientation='vertical',label='Latitude')
+# d = axes[3].scatter(data_pd['Fire_wet_log'], data_pd['Atmos_log'], s=2, c=data_pd['Lon'], cmap='YlGnBu')
+# fig.colorbar(d,ax=axes[3],orientation='vertical',label='Longitude')
+# for i in range(4):
+#     axes[i].set_ylabel(f'Nat log of {labels[atmos_no]} {units[atmos_no]}', size = 10)
+#     axes[i].set_xlabel('Nat log of burned area \n[% grid cell area]', size = 10)
+    
+# fig.tight_layout()
+
+# # fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/log{labels[atmos_no]}_dry_season_coloured_scatter.png', dpi = 300)
+# 
+# =============================================================================
+# Isoprene colored by burned area
+# =============================================================================
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18*cm, 14*cm))
+axes = axes.ravel()
+
+a = axes[0].scatter(data_pd['LC'], data_pd['Atmos'], s=2, c=data_pd['LAI']/10, cmap='YlGnBu')
+fig.colorbar(a,ax=axes[0],orientation='vertical',label='LAI')
+
+b = axes[1].scatter(data_pd['LC'], data_pd['Atmos'], s=2, c=data_pd['Fire'], cmap='YlGnBu')
+fig.colorbar(b,ax=axes[1],orientation='vertical',label='Burned area')
+c = axes[2].scatter(data_pd['LC'], data_pd['Atmos'], s=2, c=data_pd['Lat'], cmap='YlGnBu')
+fig.colorbar(c,ax=axes[2],orientation='vertical',label='Latitude')
+d = axes[3].scatter(data_pd['LC'], data_pd['Atmos'], s=2, c=data_pd['Lon'], cmap='YlGnBu')
+fig.colorbar(d,ax=axes[3],orientation='vertical',label='Longitude')
+for i in range(4):
+    axes[i].set_ylabel(f'{labels[atmos_no]} {units[atmos_no]}', size = 10)
+    axes[i].set_xlabel('Forest cover', size = 10)
+    
+fig.tight_layout()
+
+# fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/{labels[atmos_no]}_dry_season_coloured_scatter.png', dpi = 300)
+
+# =============================================================================
+# binning - alternative method
+# =============================================================================
+Xi_all = data_log_pd['Fire_log']
+# Xi = data_pd[['LC', 'Fire']]
+y_all = data_log_pd['Atmos_log']
+
+X_all = sm.add_constant(Xi_all)
+
+reg = TheilSenRegressor().fit(X_all, y_all)
+# reg = OLS().fit(X, y)
+
+score = reg.score(X_all, y_all)
+print(score)
+y_pred_all = reg.predict(X_all)
+
+import scipy.stats
+sorted_fire = data_pd.sort_values('Fire')
+
+bin_edges = np.arange(0, 0.5, 0.025)
+bin_edges = np.append(bin_edges, 0.5)
+
+test_atm = scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Atmos'], bins= bin_edges)[0]
+test_fire = scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Fire'], bins= bin_edges)[0]
+test_error = scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Atmos'], statistic = 'std', bins= bin_edges)[0] \
+    / np.sqrt(scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Atmos'], statistic = 'count', bins= bin_edges)[0])
+fire_error = scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Fire'], statistic = 'std', bins= bin_edges)[0] \
+    / np.sqrt(scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Fire'], statistic = 'count', bins= bin_edges)[0])
+
+
+
+err_max = test_atm + test_error
+err_min = test_atm - test_error
+
+ferr_max = test_fire + fire_error
+ferr_min = test_fire - fire_error
+
+Xi = np.log(test_fire)
+# Xi = data_pd[['LC', 'Fire']]
+y = np.log(test_atm)
+X = sm.add_constant(Xi)
+
+### weighted least squares
+
+mod_weighted = sm.WLS(y, X, weights = 1/test_error, missing = 'drop')
+reg_weighted = mod_weighted.fit()
+print(reg_weighted.summary())
+y_pred = reg_weighted.predict(X)
+
+log_min = np.log(err_min)
+log_max = np.log(err_max)
+log_errors  =np.zeros((2, len(log_min)))
+log_errors[0,:] = y - log_min 
+log_errors[1,:] = log_max - y
+
+flog_min = np.log(ferr_min)
+flog_max = np.log(ferr_max)
+flog_errors  =np.zeros((2, len(flog_min)))
+flog_errors[0,:] = Xi - flog_min 
+flog_errors[1,:] = flog_max - Xi
+
+# fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+# axes.errorbar(Xi, y, log_errors, flog_errors, linestyle = '',\
+#                   marker = 'o', markersize = 2, capsize = 4, c = 'grey')
+# # axes.scatter(Xi, y, marker = 'o', facecolors = 'none', edgecolor = 'grey')
+# axes.plot(Xi, y_pred, label = 'Predicted', c = 'navy')
+# axes.set_ylabel(f'Nat log of mean {labels[atmos_no]} {units[atmos_no]}', size = 16)
+# axes.set_xlabel('Nat log of mean burned area [% grid cell area]', size = 16) #'Broadleaf Forest Cover %' 'Burned Area [% grid cell area]'
+# fig.text(0.3, 0.7, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}', size = 12, c = 'navy') # \nR$^{2}$ = 0.98
+# # axes.set_ylim(ymin = 34.5, ymax = 36)
+
+
+
+resid_WLS = np.zeros(20)
+for i in range(20):
+    resid_WLS[i] = y[i] - (reg_weighted.params[0] + Xi[i]*reg_weighted.params[1])
+
+
+fontsize = 8
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(12*cm, 18*cm))
+axes = axes.ravel()
+axes[0].scatter(Xi_all, y_all, s = 2, c='grey', cmap='YlGnBu')#c = data_pd['LC'])
+axes[0].plot(Xi_all, y_pred_all, c ='navy')
+axes[0].set_ylabel('log$_{e}$ ' + f'of {labels[atmos_no]}', size = fontsize)
+axes[0].set_xlabel('log$_{e}$ of burned area', size = fontsize)
+axes[0].tick_params(labelsize=fontsize)
+
+axes[1].errorbar(Xi, y,  log_errors, linestyle = '',\
+                  marker = 'o', markersize = 2, capsize = 4, c = 'grey')
+# axes[1].errorbar(Xi, y,  test_error, linestyle = '',\
+#                   marker = 'o', markersize = 2, capsize = 4, c = 'grey')
+
+axes[1].plot(Xi, reg_weighted.params[0] + Xi*reg_weighted.params[1], c ='navy')
+axes[1].set_ylabel('log$_{e}$ ' + f'of {labels[atmos_no]}', size = fontsize)
+axes[1].set_xlabel('log$_{e}$ of burned area', size = fontsize)
+axes[1].set_yticks(np.arange(35, 36.5, 0.5))
+axes[1].tick_params(labelsize=fontsize)
+
+axes[2].hist(resid_WLS, color = 'grey')
+axes[2].set_ylabel('Residual count', size = fontsize)
+axes[2].set_xlabel('log$_{e}$(NO$_{2}$) residuals for the WLS regression', size = fontsize)
+axes[2].tick_params(labelsize=fontsize)
+
+# axes.tick_params(axis='both', which='major', labelsize=14)
+# fig.text(0.23, 0.89, f'y = {reg.coef_[1]:.2e}*x + {reg.coef_[0]:.2e}  \nR$^{2}$ = {score:.2f}', size = 12, c = 'navy')
+# fig.text(0.23, 0.57, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = {reg_weighted.rsquared:.2f}', size = 12, c = 'navy')
+
+fig.text(0.2, 0.95, r'log$_{e}$(NO$_{2}$) = 1.98 $\times$ 10$^{-1}$ $\times$ log$_{e}$(BA) $\plus$ 18', size = fontsize, c = 'navy') 
+fig.text(0.2, 0.91, f'R$^{2}$ = {score:.2f}', size = fontsize, c = 'navy')
+fig.text(0.2, 0.62, r'log$_{e}$(NO$_{2}$) = 2.61 $\times$ 10$^{-1}$ $\times$ log$_{e}$(BA) $\plus$ 36.1', size = fontsize, c = 'navy') 
+fig.text(0.2, 0.58, f'R$^{2}$ = {reg_weighted.rsquared:.2f}', size = fontsize, c = 'navy')
+
+
+fig.text(0.03, 0.95, '(a)', size = fontsize)
+fig.text(0.03, 0.65, '(b)', size = fontsize)
+fig.text(0.03, 0.33, '(c)', size = fontsize)
+
+fig.tight_layout()
+
+# 1 column?
+fontsize = 7
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(8.3*cm, 13*cm))
+axes = axes.ravel()
+axes[0].scatter(Xi_all, y_all, s = 2, c='grey', cmap='YlGnBu')#c = data_pd['LC'])
+axes[0].plot(Xi_all, y_pred_all, c ='navy')
+axes[0].set_ylabel('log$_{e}$ ' + f'of {labels[atmos_no]}', size = fontsize)
+axes[0].set_xlabel('log$_{e}$ of burned area', size = fontsize)
+axes[0].tick_params(labelsize=fontsize)
+
+axes[1].errorbar(Xi, y,  log_errors, linestyle = '',\
+                  marker = 'o', markersize = 2, capsize = 4, c = 'grey')
+# axes[1].errorbar(Xi, y,  test_error, linestyle = '',\
+#                   marker = 'o', markersize = 2, capsize = 4, c = 'grey')
+
+axes[1].plot(Xi, reg_weighted.params[0] + Xi*reg_weighted.params[1], c ='navy')
+axes[1].set_ylabel('log$_{e}$ ' + f'of {labels[atmos_no]}', size = fontsize)
+axes[1].set_xlabel('log$_{e}$ of burned area', size = fontsize)
+axes[1].set_yticks(np.arange(35, 36.5, 0.5))
+axes[1].tick_params(labelsize=fontsize)
+
+axes[2].hist(resid_WLS, color = 'grey')
+axes[2].set_ylabel('Residual count', size = fontsize)
+axes[2].set_xlabel('log$_{e}$(NO$_{2}$) residuals for the WLS regression', size = fontsize)
+axes[2].tick_params(labelsize=fontsize)
+
+# axes.tick_params(axis='both', which='major', labelsize=14)
+# fig.text(0.23, 0.89, f'y = {reg.coef_[1]:.2e}*x + {reg.coef_[0]:.2e}  \nR$^{2}$ = {score:.2f}', size = 12, c = 'navy')
+# fig.text(0.23, 0.57, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = {reg_weighted.rsquared:.2f}', size = 12, c = 'navy')
+
+fig.text(0.21, 0.95, r'log$_{e}$(NO$_{2}$) = 1.98 $\times$ 10$^{-1}$ $\times$ log$_{e}$(BA) $\plus$ 18', size = fontsize, c = 'navy') 
+fig.text(0.21, 0.91, f'R$^{2}$ = {score:.2f}', size = fontsize, c = 'navy')
+fig.text(0.21, 0.62, r'log$_{e}$(NO$_{2}$) = 2.61 $\times$ 10$^{-1}$ $\times$ log$_{e}$(BA) $\plus$ 36.1', size = fontsize, c = 'navy') 
+fig.text(0.21, 0.58, f'R$^{2}$ = {reg_weighted.rsquared:.2f}', size = fontsize, c = 'navy')
+
+
+fig.text(0.03, 0.95, '(a)', size = fontsize)
+fig.text(0.03, 0.65, '(b)', size = fontsize)
+fig.text(0.03, 0.33, '(c)', size = fontsize)
+
+fig.tight_layout()
+
+
+# save figure
+# fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/{labels[atmos_no]}_dry_season_regression_summary_corrGFED4.png', dpi = 300)
+# fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/{labels[atmos_no]}_dry_season_regression_summary.pdf')
+# fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/{labels[atmos_no]}_dry_season_regression_summary_1col.pdf')
+
+# bin_edges = np.arange(0, 500/10000, 10/10000)
+# bin_edges = np.append(bin_edges, 0.5)
+
+# test_atm = scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Atmos'], bins= bin_edges)[0]
+# test_fire = scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Fire'], bins= bin_edges)[0]
+# test_error = scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Atmos'], statistic = 'std', bins= bin_edges)[0] \
+#     / np.sqrt(scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Atmos'], statistic = 'count', bins= bin_edges)[0])
+
+# Xi = np.log(test_fire)
+# # Xi = data_pd[['LC', 'Fire']]
+# y = np.log(test_atm)
+# X = sm.add_constant(Xi)
+
+# ### weighted least squares
+
+# mod_weighted = sm.WLS(y, X, weights = 1/test_error, missing = 'drop')
+# reg_weighted = mod_weighted.fit()
+# print(reg_weighted.summary())
+# y_pred = reg_weighted.predict(X)
+# fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+# axes.scatter(Xi, y, marker = 'o', facecolors = 'none', edgecolor = 'grey')
+# axes.plot(Xi, y_pred, label = 'Predicted', c = 'navy')
+# axes.set_ylabel(f'Nat log of mean {labels[atmos_no]} {units[atmos_no]}', size = 16)
+# axes.set_xlabel('Nat log of mean burned area [% grid cell area]', size = 16) #'Broadleaf Forest Cover %' 'Burned Area [% grid cell area]'
+# fig.text(0.3, 0.7, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}', size = 12, c = 'navy') # \nR$^{2}$ = 0.98
+
+# =============================================================================
+# Data separated by forest cover
+# =============================================================================
+database = other_pd
+Xi_all = database['Fire_log']
+# Xi = data_pd[['LC', 'Fire']]
+y_all = database['Atmos_log']
+
+X_all = sm.add_constant(Xi_all)
+
+reg = TheilSenRegressor().fit(X_all, y_all)
+# reg = OLS().fit(X, y)
+
+score = reg.score(X_all, y_all)
+print(score)
+y_pred_all = reg.predict(X_all)
+
+import scipy.stats
+sorted_fire = database.sort_values('Fire')
+
+bin_edges = np.arange(0, 500/10000, 25/10000)
+bin_edges = np.append(bin_edges, 0.5)
+
+test_atm = scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Atmos'], bins= bin_edges)[0]
+test_fire = scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Fire'], bins= bin_edges)[0]
+test_error = scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Atmos'], statistic = 'std', bins= bin_edges)[0] \
+    / np.sqrt(scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Atmos'], statistic = 'count', bins= bin_edges)[0])
+fire_error = scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Fire'], statistic = 'std', bins= bin_edges)[0] \
+    / np.sqrt(scipy.stats.binned_statistic(sorted_fire['Fire'], sorted_fire['Fire'], statistic = 'count', bins= bin_edges)[0])
+
+
+
+err_max = test_atm + test_error
+err_min = test_atm - test_error
+
+ferr_max = test_fire + fire_error
+ferr_min = test_fire - fire_error
+
+Xi = np.log(test_fire)
+# Xi = data_pd[['LC', 'Fire']]
+y = np.log(test_atm)
+X = sm.add_constant(Xi)
+
+### weighted least squares
+
+mod_weighted = sm.WLS(y, X, weights = 1/test_error, missing = 'drop')
+reg_weighted = mod_weighted.fit()
+print(reg_weighted.summary())
+y_pred = reg_weighted.predict(X)
+
+log_min = np.log(err_min)
+log_max = np.log(err_max)
+log_errors  =np.zeros((2, len(log_min)))
+log_errors[0,:] = y - log_min 
+log_errors[1,:] = log_max - y
+
+flog_min = np.log(ferr_min)
+flog_max = np.log(ferr_max)
+flog_errors  =np.zeros((2, len(flog_min)))
+flog_errors[0,:] = Xi - flog_min 
+flog_errors[1,:] = flog_max - Xi
+
+# fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+# axes.errorbar(Xi, y, log_errors, flog_errors, linestyle = '',\
+#                  marker = 'o', markersize = 2, capsize = 4, c = 'grey')
+# # axes.scatter(Xi, y, marker = 'o', facecolors = 'none', edgecolor = 'grey')
+# axes.plot(Xi, y_pred, label = 'Predicted', c = 'navy')
+# axes.set_ylabel(f'Nat log of mean {labels[atmos_no]} {units[atmos_no]}', size = 16)
+# axes.set_xlabel('Nat log of mean burned area [% grid cell area]', size = 16) #'Broadleaf Forest Cover %' 'Burned Area [% grid cell area]'
+# fig.text(0.3, 0.7, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}', size = 12, c = 'navy') # \nR$^{2}$ = 0.98
+# # axes.set_ylim(ymin = 34.5, ymax = 36)
+
+
+
+resid_WLS = np.zeros(20)
+for i in range(20):
+    resid_WLS[i] = y[i] - (reg_weighted.params[0] + Xi[i]*reg_weighted.params[1])
+
+
+
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(12*cm, 18*cm))
+axes = axes.ravel()
+axes[0].scatter(Xi_all, y_all, s = 2, c=other_pd['LC'], cmap='YlGnBu')#c = 'grey')
+axes[0].plot(Xi_all, y_pred_all, c ='navy')
+axes[0].set_ylabel(f'Natural log of {labels[atmos_no]} \n{units[atmos_no]}', size = 10)
+axes[0].set_xlabel('Natural log of burned area', size = 10)
+
+axes[1].errorbar(Xi, y,  log_errors, linestyle = '',\
+                 marker = 'o', markersize = 2, capsize = 4, c = 'grey')
+axes[1].plot(Xi, reg_weighted.params[0] + Xi*reg_weighted.params[1], c ='navy')
+axes[1].set_ylabel(f'Natural log of {labels[atmos_no]} \n{units[atmos_no]}', size = 10)
+axes[1].set_xlabel('Natural log of burned area', size = 10)
+
+axes[2].hist(resid_WLS, color = 'grey')
+axes[2].set_ylabel('Residual count', size = 10)
+axes[2].set_xlabel('log(NO2) residuals for the WLS regression', size = 10)
+
+
+# axes.tick_params(axis='both', which='major', labelsize=14)
+# fig.text(0.23, 0.89, f'y = {reg.coef_[1]:.2e}*x + {reg.coef_[0]:.2e}  \nR$^{2}$ = {score:.2f}', size = 12, c = 'navy')
+# fig.text(0.23, 0.57, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = {reg_weighted.rsquared:.2f}', size = 12, c = 'navy')
+
+fig.text(0.23, 0.95, r'$log_{e}(NO_2) = 1.82 \times 10^{-1} \times log_{e}(BA) \plus 18$', size = 11, c = 'navy') 
+fig.text(0.23, 0.91, f'R$^{2}$ = {score:.2f}', size = 11, c = 'navy')
+fig.text(0.23, 0.62, r'$log_{e}(NO_2) = 2.59 \times 10^{-1} \times log_{e}(BA) \plus 36.7$', size = 11, c = 'navy') 
+fig.text(0.23, 0.58, f'R$^{2}$ = {reg_weighted.rsquared:.2f}', size = 11, c = 'navy')
+
+
+fig.text(0.03, 0.95, '(a)', size = 14)
+fig.text(0.03, 0.65, '(b)', size = 14)
+fig.text(0.03, 0.33, '(c)', size = 14)
+
+fig.tight_layout()
+# 
+# =============================================================================
+# Isoprene regression figure
+# =============================================================================
+Xi_all = data_pd['LC']
+# Xi = data_pd[['LC', 'Fire']]
+y_all = data_pd['Atmos']
+
+X_all = sm.add_constant(Xi_all)
+
+reg = TheilSenRegressor().fit(X_all, y_all)
+# reg = OLS().fit(X, y)
+
+score = reg.score(X_all, y_all)
+print(score)
+y_pred_all = reg.predict(X_all)
+
+# import scipy.stats
+sorted_lc = data_pd.sort_values('LC')
+
+bin_edges = np.arange(0, 500/10000, 25/10000)
+bin_edges = np.append(bin_edges, 0.5)
+
+test_atm = scipy.stats.binned_statistic(sorted_lc['LC'], sorted_lc['Atmos'], bins= 20)[0]
+test_lc = scipy.stats.binned_statistic(sorted_lc['LC'], sorted_lc['LC'], bins= 20)[0]
+test_error = scipy.stats.binned_statistic(sorted_lc['LC'], sorted_lc['Atmos'], statistic = 'std', bins= 20)[0] \
+    / np.sqrt(scipy.stats.binned_statistic(sorted_lc['LC'], sorted_lc['Atmos'], statistic = 'count', bins= 20)[0])
+lc_error = scipy.stats.binned_statistic(sorted_lc['LC'], sorted_lc['LC'], statistic = 'std', bins= 20)[0] \
+    / np.sqrt(scipy.stats.binned_statistic(sorted_lc['LC'], sorted_lc['LC'], statistic = 'count', bins= 20)[0])
+
+
+Xi = test_lc
+y = test_atm
+X = sm.add_constant(Xi)
+
+### weighted least squares
+mod_weighted = sm.WLS(y, X, weights = 1/test_error, missing = 'drop')
+reg_weighted = mod_weighted.fit()
+
+resid_WLS = np.zeros(20)
+for i in range(20):
+    resid_WLS[i] = test_atm[i] - (reg_weighted.params[0] + Xi[i]*reg_weighted.params[1])
+
+
+fontsize = 9
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(10*cm, 14*cm))
+axes = axes.ravel()
+axes[0].scatter(Xi_all, y_all/10**16, s = 2, c = 'grey')
+axes[0].plot(Xi_all, y_pred_all/10**16, c ='navy')
+axes[0].set_ylabel(f'{labels[atmos_no]} \n{units[atmos_no]}', size = fontsize)
+axes[0].set_xlabel('Broadleaf Forest Cover %', size = fontsize)
+axes[0].tick_params(labelsize=fontsize)
+
+axes[1].errorbar(Xi, y/10**16,  test_error/10**16, linestyle = '',\
+                 marker = 'o', markersize = 2, capsize = 4, c = 'grey')
+axes[1].plot(Xi, reg_weighted.params[0]/10**16 + Xi*reg_weighted.params[1]/10**16, c ='navy')
+axes[1].set_ylabel(f'{labels[atmos_no]} \n{units[atmos_no]}', size = fontsize)
+axes[1].set_xlabel('Broadleaf Forest Cover %', size = fontsize)
+axes[1].set_yticks(np.arange(0.5, 1.6, 0.5))
+axes[1].tick_params(labelsize=fontsize)
+
+axes[2].hist(resid_WLS/10**16, color = 'grey')
+axes[2].set_ylabel('Residual count', size = fontsize)
+axes[2].set_xlabel(f'Isoprene residuals for the WLS regression \n{units[atmos_no]}', size = fontsize)
+axes[2].tick_params(labelsize=fontsize)
+
+# axes.tick_params(axis='both', which='major', labelsize=14)
+# fig.text(0.23, 0.89, f'y = {reg.coef_[1]:.2e}*x + {reg.coef_[0]:.2e}  \nR$^{2}$ = {score:.2f}', size = 12, c = 'navy')
+# fig.text(0.23, 0.57, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = {reg_weighted.rsquared:.2f}', size = 12, c = 'navy')
+
+fig.text(0.23, 0.94, r'Isop = 1.12 $\times$ 10$^{14}$ $\times$ BFC $\plus$ 1.26 $\times$ 10$^{15}$', size = fontsize, c = 'navy') 
+fig.text(0.23, 0.9, f'R$^{2}$ = {score:.2f}', size = fontsize, c = 'navy')
+fig.text(0.23, 0.63, r'Isop = 1.08 $\times$ 10$^{14}$ $\times$ BFC $\plus$ 2.66 $\times$ 10$^{15}$', size = fontsize, c = 'navy') 
+fig.text(0.23, 0.58, f'R$^{2}$ = {reg_weighted.rsquared:.2f}', size = fontsize, c = 'navy')
+
+
+
+fig.text(0.03, 0.95, '(a)', size = fontsize)
+fig.text(0.03, 0.65, '(b)', size = fontsize)
+fig.text(0.03, 0.33, '(c)', size = fontsize)
+
+fig.tight_layout()
+
+
+fontsize = 7
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(8.3*cm, 13*cm))
+axes = axes.ravel()
+axes[0].scatter(Xi_all, y_all/10**16, s = 2, c = 'grey')
+axes[0].plot(Xi_all, y_pred_all/10**16, c ='navy')
+axes[0].set_ylabel(f'{labels[atmos_no]} \n{units[atmos_no]}', size = fontsize)
+axes[0].set_xlabel('Broadleaf Forest Cover %', size = fontsize)
+axes[0].tick_params(labelsize=fontsize)
+
+axes[1].errorbar(Xi, y/10**16,  test_error/10**16, linestyle = '',\
+                 marker = 'o', markersize = 2, capsize = 4, c = 'grey')
+axes[1].plot(Xi, reg_weighted.params[0]/10**16 + Xi*reg_weighted.params[1]/10**16, c ='navy')
+axes[1].set_ylabel(f'{labels[atmos_no]} \n{units[atmos_no]}', size = fontsize)
+axes[1].set_xlabel('Broadleaf Forest Cover %', size = fontsize)
+axes[1].set_yticks(np.arange(0.5, 1.6, 0.5))
+axes[1].tick_params(labelsize=fontsize)
+
+axes[2].hist(resid_WLS/10**16, color = 'grey')
+axes[2].set_ylabel('Residual count', size = fontsize)
+axes[2].set_xlabel(f'Isoprene residuals for the WLS regression \n{units[atmos_no]}', size = fontsize)
+axes[2].tick_params(labelsize=fontsize)
+
+# axes.tick_params(axis='both', which='major', labelsize=14)
+# fig.text(0.23, 0.89, f'y = {reg.coef_[1]:.2e}*x + {reg.coef_[0]:.2e}  \nR$^{2}$ = {score:.2f}', size = 12, c = 'navy')
+# fig.text(0.23, 0.57, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = {reg_weighted.rsquared:.2f}', size = 12, c = 'navy')
+
+fig.text(0.23, 0.94, r'Isop = 1.12 $\times$ 10$^{14}$ $\times$ BFC $\plus$ 1.26 $\times$ 10$^{15}$', size = fontsize, c = 'navy') 
+fig.text(0.23, 0.9, f'R$^{2}$ = {score:.2f}', size = fontsize, c = 'navy')
+fig.text(0.23, 0.63, r'Isop = 1.08 $\times$ 10$^{14}$ $\times$ BFC $\plus$ 2.66 $\times$ 10$^{15}$', size = fontsize, c = 'navy') 
+fig.text(0.23, 0.58, f'R$^{2}$ = {reg_weighted.rsquared:.2f}', size = fontsize, c = 'navy')
+
+
+
+fig.text(0.03, 0.95, '(a)', size = fontsize)
+fig.text(0.03, 0.65, '(b)', size = fontsize)
+fig.text(0.03, 0.33, '(c)', size = fontsize)
+
+fig.tight_layout()
+# save figure
+# fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/{labels[atmos_no]}_dry_season_regression_summary_formatted.png', dpi = 300)
+# fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/{labels[atmos_no]}_dry_season_regression_summary_formatted.pdf')
+# fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/{labels[atmos_no]}_dry_season_regression_summary_formatted_1col.pdf')
+# 
+###
+
+# dry season all
+data3 = []
+data3_len = []
+data4 = []
+data4_len = []
+
+for p in range(5, 101, 5): # or 51 for urban
+    distribution_data = get_atm_dist(atmos_wet_slice, reshape_lc, p)
+    distribution_data = distribution_data[~np.isnan(distribution_data)]
+    data3.append(distribution_data)
+    data3_len.append(len(distribution_data))
+    
+for p in range(5, 101, 5): # or 51 for urban
+    distribution_data = get_atm_dist(fire_slice, reshape_lc, p)
+    distribution_data = distribution_data[~np.isnan(distribution_data)]
+    data4.append(distribution_data)
+    data4_len.append(len(distribution_data))
+    
+def calc_statistic2(data, stat = 'median'):
+    data_means = np.zeros(20)
+    if stat == 'mean':
+        for i,a in enumerate(data):
+            data_means[i]=a.mean()
+    elif stat == 'median':
+        for i,a in enumerate(data):
+            data_means[i]=np.median(a)  
+    elif stat == 'std':
+        for i,a in enumerate(data):
+            data_means[i]=np.std(a)          
+    else:
+        print('invalid stat')
+    return data_means
+        
+data3_means = calc_statistic2(data3, stat = 'mean')
+data4_means = calc_statistic2(data4, stat= 'mean')
+data3_std = calc_statistic2(data3, stat = 'std')
+data4_std = calc_statistic2(data4, stat= 'std')
+data3_err = calc_statistic2(data3, stat = 'std')/np.sqrt(data3_len)
+data4_err = calc_statistic2(data4, stat= 'std')/np.sqrt(data4_len)
+lcs = np.arange(2.5, 98, 5)
+
+data = {'Atmos': data3_means, 'LC': lcs, 'LC_log': np.log(lcs), 'Fire': data4_means} #'LAI': lai_1d, } #, 'expFire': np.exp(fire_1d)}
+data_pd = pd.DataFrame(data)
+Xi = data_pd['LC']
+y = data_pd['Atmos']
+X = sm.add_constant(Xi)
+
+### weighted least squares
+mod_weighted = sm.WLS(y, X, weights = 1/data3_err, missing = 'drop')
+reg_weighted = mod_weighted.fit()
+
+resid_WLS = np.zeros(20)
+for i in range(20):
+    resid_WLS[i] = data3_means[i] - (reg_weighted.params[0] + Xi[i]*reg_weighted.params[1])
+
+
+
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(12*cm, 18*cm))
+axes = axes.ravel()
+axes[0].scatter(Xi_all, y_all/10**16, marker = 'o', facecolors = 'none', edgecolors = 'grey')
+axes[0].plot(Xi_all, y_pred_all/10**16, c ='navy')
+axes[0].set_ylabel(f'{labels[atmos_no]} \n{units[atmos_no]}', size = 10)
+axes[0].set_xlabel('Broadleaf Forest Cover %', size = 10)
+
+axes[1].errorbar(Xi, y/10**16,  data3_err/10**16, linestyle = '',\
+                 marker = 'o', markersize = 2, capsize = 4, c = 'grey')
+axes[1].plot(Xi, reg_weighted.params[0]/10**16 + Xi*reg_weighted.params[1]/10**16, c ='navy')
+axes[1].set_ylabel(f'{labels[atmos_no]} \n{units[atmos_no]}', size = 10)
+axes[1].set_xlabel('Broadleaf Forest Cover %', size = 10)
+
+axes[2].hist(resid_WLS, color = 'grey')
+axes[2].set_ylabel('Residual count', size = 10)
+axes[2].set_xlabel('Isoprene residuals for the WLS regression', size = 10)
+
+
+# axes.tick_params(axis='both', which='major', labelsize=14)
+fig.text(0.23, 0.89, f'y = {reg.coef_[1]:.2e}*x + {reg.coef_[0]:.2e}  \nR$^{2}$ = {score:.2f}', size = 12, c = 'navy')
+fig.text(0.23, 0.57, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = {reg_weighted.rsquared:.2f}', size = 12, c = 'navy')
+
+fig.text(0.04, 0.95, '(a)', size = 14)
+fig.text(0.04, 0.65, '(b)', size = 14)
+fig.text(0.04, 0.33, '(c)', size = 14)
+
+fig.tight_layout()
+
+# save figure
+fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/{labels[atmos_no]}_wet_season_regression_summary.png', dpi = 300)
+# 
+###
+
 
 # =============================================================================
 # Robust regression, all data
@@ -527,13 +1302,67 @@ plt.plot(Xi, y_pred, label = 'Predicted')
 
 
 
+# =============================================================================
+# data exploration figures
+# =============================================================================
+# NO2 ~ log(fire)
+Xi = data_pd['Fire_log']
+y = data_pd['Atmos']
+X = sm.add_constant(Xi)
+
+reg = TheilSenRegressor().fit(X, y)
+
+score = reg.score(X, y)
+print(score)
+y_pred = reg.predict(X)
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+axes.scatter(Xi, y, facecolors = 'none', edgecolor="grey", s=40, label = 'Data')
+axes.plot(Xi, y_pred, label = 'Predicted', c = 'navy')
+axes.set_ylabel(f'{labels[atmos_no]} {units[atmos_no]}', size = 16)
+axes.set_xlabel('log of burned area [% grid cell area]', size = 16) #'Broadleaf Forest Cover %' 'Burned Area [% grid cell area]'
+fig.text(0.23, 0.7, f'y = {reg.coef_[1]:.2e}*x + {reg.coef_[0]:.2e}  \nR$^{2}$ = {score:.2f}', size = 12, c = 'navy')
 
 
 
 
+# log(no2) ~ log(fire)
+Xi = data_pd['Fire_log']
+y = data_pd['Atmos_log']
+X = sm.add_constant(Xi)
+
+reg = TheilSenRegressor().fit(X, y)
+
+score = reg.score(X, y)
+print(score)
+y_pred = reg.predict(X)
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+axes.scatter(Xi, y, facecolors = 'none', edgecolor="grey", s=40, label = 'Data')
+axes.plot(Xi, y_pred, label = 'Predicted', c = 'navy')
+axes.set_ylabel(f'log of {labels[atmos_no]} {units[atmos_no]}', size = 16)
+axes.set_xlabel('log of burned area [% grid cell area]', size = 16) #'Broadleaf Forest Cover %' 'Burned Area [% grid cell area]'
+fig.text(0.23, 0.7, f'y = {reg.coef_[1]:.2e}*x + {reg.coef_[0]:.2e}  \nR$^{2}$ = {score:.2f}', size = 12, c = 'navy')
 
 
 
+# no2 ~ sqrt(fire)
+Xi = data_pd['Fire_sqrt']
+y = data_pd['Atmos']
+X = sm.add_constant(Xi)
+
+reg = TheilSenRegressor().fit(X, y)
+
+score = reg.score(X, y)
+print(score)
+y_pred = reg.predict(X)
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+axes.scatter(Xi, y, facecolors = 'none', edgecolor="grey", s=40, label = 'Data')
+axes.plot(Xi, y_pred, label = 'Predicted', c = 'navy')
+axes.set_ylabel(f'{labels[atmos_no]} {units[atmos_no]}', size = 16)
+axes.set_xlabel('Sqrt of burned area [% grid cell area]', size = 16) #'Broadleaf Forest Cover %' 'Burned Area [% grid cell area]'
+fig.text(0.6, 0.7, f'y = {reg.coef_[1]:.2e}*x + {reg.coef_[0]:.2e}  \nR$^{2}$ = {score:.2f}', size = 12, c = 'navy')
 
 
 
@@ -1058,6 +1887,26 @@ data3_len = []
 data4 = []
 data4_len = []
 
+# def get_fire_dist25(atm_comp, lc, perc):
+#     if perc == 0.000025:
+#         cover = ma.masked_less_equal(lc, perc).mask.flatten()
+#     if perc ==0.05:
+#         cover = ma.masked_greater(lc, 0.0475).mask.flatten()
+#     else:
+#         cover = ma.masked_inside(lc, perc - 0.0249, perc).mask.flatten()
+    
+#     atm_comp_1d = atm_comp.values.flatten()   
+#     # atm_comp_1d = atm_comp.flatten()   # use for hcho
+#     if np.any(cover) == False:
+#         cover = np.zeros_like(atm_comp_1d, dtype = np.bool)
+#     atm_comp_dist = atm_comp_1d[cover]
+#     return atm_comp_dist
+
+# for p in range(0.000025, 0.0501, 0.000025): # or 51 for urban
+#     distribution_data = get_fire_dist25(atmos_dry_slice, fire_slice, p)
+#     distribution_data = distribution_data[~np.isnan(distribution_data)]
+#     data3.append(distribution_data)
+#     data3_len.append(len(distribution_data))
 
 
 def get_fire_dist25(atm_comp, lc, perc):
@@ -1068,37 +1917,44 @@ def get_fire_dist25(atm_comp, lc, perc):
     else:
         cover = ma.masked_inside(lc, perc - 24.9, perc).mask.flatten()
     
-    atm_comp_1d = atm_comp.values.flatten()   
+    atm_comp_1d = atm_comp.values.flatten()
+    fire_1d = lc.values.flatten()
     # atm_comp_1d = atm_comp.flatten()   # use for hcho
     if np.any(cover) == False:
         cover = np.zeros_like(atm_comp_1d, dtype = np.bool)
     atm_comp_dist = atm_comp_1d[cover]
-    return atm_comp_dist
+    fire_dist = fire_1d[cover]
+    return atm_comp_dist, fire_dist
 
 for p in range(25, 501, 25): # or 51 for urban
     distribution_data = get_fire_dist25(atmos_dry_slice, fire_slice*10000, p)
-    distribution_data = distribution_data[~np.isnan(distribution_data)]
-    data3.append(distribution_data)
-    data3_len.append(len(distribution_data))
+    atm_data1 = distribution_data[0]
+    atm_data = atm_data1[~np.isnan(atm_data1)]
+    fire_data = distribution_data[1]
+    fire_data = fire_data[~np.isnan(atm_data1)]
+    data3.append(atm_data)
+    data4.append(fire_data)
+    data3_len.append(len(atm_data))
+    data4_len.append(len(fire_data))
     
-def get_fire_dist_2(atm_comp, lc, perc):
-    if perc == 25:
-        cover = ma.masked_less_equal(lc, perc).mask.flatten()
-    if perc ==500:
-        cover = ma.masked_greater(lc, 475).mask.flatten()
-    else:
-        cover = ma.masked_inside(lc, perc - 24.9, perc).mask.flatten()
-    atm_comp_1d = atm_comp.flatten()   # use for hcho
-    if np.any(cover) == False:
-        cover = np.zeros_like(atm_comp_1d, dtype = np.bool)
-    atm_comp_dist = atm_comp_1d[cover]
-    return atm_comp_dist
+# def get_fire_dist_2(atm_comp, lc, perc):
+#     if perc == 25:
+#         cover = ma.masked_less_equal(lc, perc).mask.flatten()
+#     if perc ==500:
+#         cover = ma.masked_greater(lc, 475).mask.flatten()
+#     else:
+#         cover = ma.masked_inside(lc, perc - 24.9, perc).mask.flatten()
+#     atm_comp_1d = atm_comp.flatten()   # use for hcho
+#     if np.any(cover) == False:
+#         cover = np.zeros_like(atm_comp_1d, dtype = np.bool)
+#     atm_comp_dist = atm_comp_1d[cover]
+#     return atm_comp_dist
 
-for p in range(25, 501, 25): # or 51 for urban
-    distribution_data = get_fire_dist_2(reshape_lc, fire_slice*10000, p)
-    distribution_data = distribution_data[~np.isnan(distribution_data)]
-    data4.append(distribution_data)
-    data4_len.append(len(distribution_data))
+# for p in range(25, 501, 25): # or 51 for urban
+#     distribution_data = get_fire_dist_2(reshape_lc, fire_slice*10000, p)
+#     distribution_data = distribution_data[~np.isnan(distribution_data)]
+#     data4.append(distribution_data)
+#     data4_len.append(len(distribution_data))
 
     
 def calc_statistic2(data, stat = 'median'):
@@ -1123,32 +1979,63 @@ data4_std = calc_statistic2(data4, stat= 'std')
 data3_err = calc_statistic2(data3, stat = 'std')/np.sqrt(data3_len)
 data4_err = calc_statistic2(data4, stat= 'std')/np.sqrt(data4_len)
 
-fires = np.arange(25, 501, 25)
+# fires = np.arange(12.5/10000, 500/10000, 25/10000)
 
 # plt.scatter(lcs, data3_means)
 # plt.scatter(data4_means, data3_means)
 
-data = {'Atmos': data3_means, 'Fire': fires, 'Fire_log': np.log(fires), 'LC': data4_means} #'LAI': lai_1d, } #, 'expFire': np.exp(fire_1d)}
+data = {'Atmos': data3_means, 'Atmos_log':np.log(data3_means), 'Fire': data4_means/10000, 'Fire_log': np.log(data4_means/10000), 'Fire_sqrt' : np.sqrt(data4_means/10000)} #'LAI': lai_1d, } #, 'expFire': np.exp(fire_1d)}
 data_pd = pd.DataFrame(data)
 
 Xi = data_pd['Fire_log']
 # Xi = data_pd[['LC', 'Fire']]
-y = data_pd['Atmos']
+y = data_pd['Atmos_log']
 
 X = sm.add_constant(Xi)
 
-mod = sm.OLS(y, X, missing = 'drop')
-
-res = mod.fit()
-
-print(res.summary())
-
-
 ### weighted least squares
 
-mod_weighted = sm.WLS(y, X, weights = 1/data3_std, missing = 'drop')
+mod_weighted = sm.WLS(y, X, weights = 1/data3_err, missing = 'drop')
 reg_weighted = mod_weighted.fit()
 print(reg_weighted.summary())
+y_pred = reg_weighted.predict(X)
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+axes.scatter(Xi, y, marker = 'o', facecolors = 'none', edgecolor = 'grey')
+axes.plot(Xi, y_pred, label = 'Predicted', c = 'navy')
+axes.set_ylabel(f'Nat log of mean {labels[atmos_no]} {units[atmos_no]}', size = 16)
+axes.set_xlabel('Nat log of mean burned area [% grid cell area]', size = 16) #'Broadleaf Forest Cover %' 'Burned Area [% grid cell area]'
+fig.text(0.3, 0.7, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = 0.98', size = 12, c = 'navy')
+# axes.set_ylim(ymin = 34.5, ymax = 36)
+
+
+
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+axes.errorbar(Xi, y,  np.log(data3_err), linestyle = '', marker = 'o', capsize = 4, c = 'grey')
+axes.plot(Xi, y_pred, label = 'Predicted', c = 'navy')
+axes.set_ylabel(f'Log of {labels[atmos_no]} {units[atmos_no]}', size = 16)
+axes.set_xlabel('Log of burned area [% grid cell area]', size = 16) #'Broadleaf Forest Cover %' 'Burned Area [% grid cell area]'
+fig.text(0.3, 0.7, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = 0.94', size = 12, c = 'navy')
+# axes.set_ylim(ymin = 34.5, ymax = 36)
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+axes.scatter(Xi, y, marker = 'o', facecolors = 'none', edgecolor = 'grey')
+axes.plot(Xi, y_pred, label = 'Predicted', c = 'navy')
+axes.set_ylabel(f'Nat log of mean {labels[atmos_no]} {units[atmos_no]}', size = 16)
+axes.set_xlabel('Nat log of mean burned area [% grid cell area]', size = 16) #'Broadleaf Forest Cover %' 'Burned Area [% grid cell area]'
+fig.text(0.3, 0.7, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = 0.98', size = 12, c = 'navy')
+# axes.set_ylim(ymin = 34.5, ymax = 36)
+
+
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+axes.errorbar(data['Fire'], data['Atmos'],  data3_err, linestyle = '', marker = 'o', capsize = 4, c = 'grey')
+axes.plot(Xi**2, y_pred, label = 'Predicted', c = 'navy')
+axes.set_ylabel(f'{labels[atmos_no]} {units[atmos_no]}', size = 16)
+axes.set_xlabel('Burned area [% grid cell area]', size = 16) #'Broadleaf Forest Cover %' 'Burned Area [% grid cell area]'
+fig.text(0.3, 0.7, f'y = {reg_weighted.params[1]:.2e}*sqrt(x) + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = 0.97', size = 12, c = 'navy')
+# axes.set_ylim(ymin = 34.5, ymax = 36)
+
 
 ### visualisation OLS and WLS
 fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
@@ -1156,10 +2043,10 @@ fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
 # axes.errorbar(Xi, y,  data3_err, linestyle = '', marker = 'o', capsize = 4, c = 'grey')
 # axes.plot(Xi, res.params[0] + Xi*res.params[1], c = 'navy', ls = ':', label = 'OLS')
 # axes.plot(Xi, reg_weighted.params[0] + Xi*reg_weighted.params[1], c = 'maroon', ls = ':', label = 'WLS')
-axes.errorbar(np.exp(Xi), y, data3_err, linestyle = '', marker = 'o', capsize = 4, c = 'grey')
-axes.plot(np.exp(Xi), res.params[0] + Xi*res.params[1], c = 'navy', ls = ':', label = 'OLS')
-axes.plot(np.exp(Xi), reg_weighted.params[0] + Xi*reg_weighted.params[1], c = 'maroon', ls = ':', label = 'WLS')
-
+axes.errorbar(Xi, y, np.log(data3_err), linestyle = '', marker = 'o', capsize = 4, c = 'grey')
+axes.plot(Xi, res.params[0] + Xi*res.params[1], c = 'navy', ls = ':', label = 'OLS')
+axes.plot(Xi, reg_weighted.params[0] + Xi*reg_weighted.params[1], c = 'maroon', ls = ':', label = 'WLS')
+axes.set_ylim(ymin = -0.01*10**14, ymax = 0.01*10**14)
 # axes.errorbar(np.exp(Xi), y, data3_err, linestyle = '', marker = 'o', c = 'grey')
 # # axes.plot(np.exp(Xi), res.params[0] + Xi*res.params[1], c = 'navy', ls = ':')
 # axes.plot(np.exp(Xi), reg_weighted.params[0] + Xi*reg_weighted.params[1], c = 'maroon', ls = ':', label = 'WLS')
@@ -1168,8 +2055,8 @@ axes.tick_params(axis='both', which='major', labelsize=14)
 axes.legend(loc='upper left')
 # fig.text(0.5, 0.25, f'y = {res.params[1]:.2e}*x + {res.params[0]:.2e}  \nR$^{2}$ = {res.rsquared:.2f}', size = 14, c = 'navy')
 # fig.text(0.5, 0.15, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = {reg_weighted.rsquared:.2f}', size = 14, c = 'maroon')
-fig.text(0.5, 0.25, f'y = {res.params[1]:.2e}*log(x) + {res.params[0]:.2e}  \nR$^{2}$ = {res.rsquared:.2f}', size = 14, c = 'navy')
-fig.text(0.5, 0.15, f'y = {reg_weighted.params[1]:.2e}*log(x) + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = {reg_weighted.rsquared:.2f}', size = 14, c = 'maroon')
+fig.text(0.5, 0.25, f'y = {res.params[1]:.2e}*x + {res.params[0]:.2e}  \nR$^{2}$ = {res.rsquared:.2f}', size = 14, c = 'navy')
+fig.text(0.5, 0.15, f'y = {reg_weighted.params[1]:.2e}*x + {reg_weighted.params[0]:.2e}  \nR$^{2}$ = {reg_weighted.rsquared:.2f}', size = 14, c = 'maroon')
 
 axes.set_ylabel(f'{labels[atmos_no]} {units[atmos_no]}', size = 16)
 axes.set_xlabel('Burned area % x 10^4', size = 16)
@@ -1188,6 +2075,11 @@ resid_WLS = np.zeros(20)
 
 for i in range(20):
     resid_WLS[i] = data3_means[i] - (reg_weighted.params[0] + Xi[i]*reg_weighted.params[1])
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+axes.hist(resid_WLS, color = 'grey')
+axes.set_ylabel('Residual count', size = 10)
+axes.set_xlabel('NO2 residuals for the WLS regression', size = 10)
 
 
 fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
