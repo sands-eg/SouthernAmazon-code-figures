@@ -590,7 +590,8 @@ for i in range(6):
     axes[i].set_yticklabels(categories, fontsize=8)
     axes[i].set_xlim(0,10)
     axes[i].set_xticks(np.arange(0,11, 5))
-    axes[i].set_xticklabels(np.arange(0, maxb+stepb/10, maxb/2), fontsize = 7)
+    # axes[i].set_xticklabels(np.arange(0, maxb+stepb/10, maxb/2), fontsize = 7)
+    axes[i].set_xticklabels(['0', '0.05', '>0.1'], fontsize = 7)
     axes[i].set_xlabel('Burned Area (%)', fontsize = 8)
     cbar = axes[i].collections[0].colorbar
     cbar.ax.tick_params(labelsize=7)

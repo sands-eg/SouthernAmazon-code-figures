@@ -677,7 +677,7 @@ cmap2 = plt.cm.get_cmap('Blues')
 levels2 = np.linspace(vmin2*scaler2, vmax2*scaler2, 11)
 
 vmin3 = 0
-vmax3 = 5000
+vmax3 = 1000
 scaler3 = 1
 cmap3 = plt.cm.get_cmap('gist_earth')
 levels3 = np.linspace(vmin3*scaler3, vmax3*scaler3, 21)

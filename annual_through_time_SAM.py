@@ -330,6 +330,7 @@ ax.legend(fontsize = 8, ncol = 2)#, loc = 'center right', bbox_to_anchor=(0.4, 0
 
 # save figure
 # fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/hcho_detrending.pdf')
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/hcho_detrending.png', dpi=300)
 
 # =============================================================================
 # mask high altitude areas

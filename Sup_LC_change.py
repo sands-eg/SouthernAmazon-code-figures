@@ -228,6 +228,7 @@ fig.tight_layout()
 
 # save figure
 # fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/land_cover_change.pdf')
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/land_cover_change.png', dpi=300)
 
 year = np.arange(2001, 2017)
 
