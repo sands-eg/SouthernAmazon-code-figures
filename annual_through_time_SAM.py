@@ -388,8 +388,10 @@ def mean_error_lc(lc):
         w_mean = (annual_pd['var']*annual_pd['w1']).sum() / annual_pd['w1'].sum()
         std = np.sqrt(np.average((annual_pd['var'] - w_mean)**2, weights=annual_pd['w1'])) # annual_pd['var'] - w_mean
         count = len(annual_pd['var'])
+        # print(count)
         broadleaf_regional[i] = w_mean
         broadleaf_error[i] = std / np.sqrt(count)
+        # broadleaf_error[i] = std
     
     return broadleaf_regional, broadleaf_error
 
@@ -429,6 +431,7 @@ def mean_error(atmos):
         w_mean = (annual_pd['var']*(annual_pd['w1']+annual_pd['w2'])).sum() / (annual_pd['w1'].sum() + annual_pd['w2'].sum())
         std = np.sqrt(np.average((annual_pd['var'] - w_mean)**2, weights=annual_pd['w1']+annual_pd['w2'])) #pd_data.std()['var'] # annual_pd['var'] - w_mean
         count = len(annual_pd['var'])
+        # print(count)
         atmos_regional[i] = w_mean
         atmos_error[i] = std / np.sqrt(count)
         # atmos_error[i] = std
