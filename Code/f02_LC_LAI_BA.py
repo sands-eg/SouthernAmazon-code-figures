@@ -576,7 +576,7 @@ longitude = broadleaf_mean.lon
 latitude = broadleaf_mean.lat
 
 data = [grass_sav, broadleaf_mean, lai_mean, fire_dry_mean]
-labels = ['(a) savanna and grassland', '(b) broadleaf forest', '(c) LAI', '(d) burned area']
+labels = ['(a) Savanna and grassland', '(b) Broadleaf forest', '(c) LAI', '(d) Burned area']
 
 # set display parameters
 vmin = 0
@@ -751,3 +751,89 @@ cb3.set_label('Dry season burned area (% grid cell area, subplot d)', fontsize =
 # fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f02_GFED5_withLAI.png', dpi = 300)
 # fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f02_LCLAIBA_mesh_wdefo.png', dpi = 300)
 # fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f02_LCLAIBA_mesh_wdefo_corrGFED4.png', dpi = 300)
+
+# =============================================================================
+# EGU version
+# =============================================================================
+cm = 1/2.54
+# set up figure
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(36*cm,48*cm), subplot_kw={'projection':projection})
+axes = axes.ravel()
+
+fontsize = 24
+
+cmap1 = plt.cm.get_cmap('gist_earth_r')
+# extract all colors from the  map
+cmaplist = [cmap1(i) for i in range(cmap1.N)]
+# create the new map
+cmap1a = mpl.colors.LinearSegmentedColormap.from_list(
+    'Custom cmap', cmaplist, cmap1.N)
+
+# define the bins and normalize
+bounds = np.linspace(0, 100, 11)
+norm = mpl.colors.BoundaryNorm(bounds, cmap1.N)
+cmap4 = plt.cm.get_cmap('magma_r')
+
+vmin2 = 0.5
+vmax2 = 1.5
+scaler2 = 1
+cmap2 = plt.cm.get_cmap('nipy_spectral')
+levels2 = np.linspace(vmin2*scaler2, vmax2*scaler2, 11)
+
+# first panel (saved as im for colour bar creation)
+im = axes[0].pcolormesh(longitude, latitude, data[0]*scaler,  vmin = 0, vmax = 100, cmap = cmap1a, norm = norm, transform=transform)#levels = levels,extend = 'neither', 
+im2 = axes[2].pcolormesh(longitude, latitude, data[2]*scaler3, vmin = 0, vmax = 5, cmap = cmap1, transform=transform)
+im3 = axes[3].pcolormesh(longitude, latitude, data[3], vmin = 0, vmax = 0.3, cmap = cmap4, transform=transform) #*scaler4
+
+# repeat for other years
+for i,y in enumerate(data):
+    axes[i].set_title(labels[i], fontsize = 30, weight='bold')
+    axes[i].coastlines()
+    if i == 2:
+        axes[i].pcolormesh(longitude, latitude, data[i]*scaler3, vmin = 0, vmax = 5, cmap = cmap1, transform=transform)
+    elif i == 3:
+        axes[i].pcolormesh(longitude, latitude, data[i], vmin = 0, vmax = 0.3, cmap = cmap4, transform=transform, alpha = 0.8)
+        axes[i].contourf(longitude, latitude, -1*defo_crop, levels = np.linspace(0.025, 1, 2), colors = 'none', \
+                        hatches=['//'], alpha = 0, transform=transform )   # hatches=['-', '/', '\\', '//']
+        # axes[i].pcolormesh(longitude, latitude, -1*defo_crop, vmin=0.25, vmax=1, alpha = 0.5, transform=transform )   # hatches=['-', '/', '\\', '//']
+    else:
+        axes[i].pcolormesh(longitude, latitude, data[i]*scaler, vmin = 0, vmax = 100, cmap = cmap1a, norm = norm, transform=transform)
+    axes[i].contourf(longitude, latitude, high_elev, levels = levels2, cmap = cmap2, extend = 'max', alpha = 1, transform=transform )
+    # axes[i].pcolormesh(longitude, latitude, high_elev, cmap = cmap2, alpha = 1, transform=transform )#levels = levels2, extend = 'max', 
+    # axes[i].set_extent([int(min_lon), int(max_lon), int(min_lat), int(max_lat)], crs = transform)
+    gl = axes[i].gridlines(draw_labels=True)
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlocator = mticker.FixedLocator([-65, -55])
+    gl.ylocator = mticker.FixedLocator([-10, -20])
+    gl.ylabel_style = {'fontsize' : fontsize}
+    gl.xlabel_style = {'fontsize' : fontsize}
+    axes[i].add_feature(cfeature.BORDERS, zorder=10)
+
+    
+# set title and layout
+# fig.suptitle('Mean cover %', fontsize = 16)
+fig.tight_layout()
+fig.subplots_adjust(bottom=0.2)
+
+# add colorbar, vertical or horizontal
+# cax = fig.add_axes([0.65, 0.05, 0.02, 0.87])
+# cb = fig.colorbar(im, cax=cax, orientation='vertical')
+cax = fig.add_axes([0.1, 0.19, 0.8, 0.01])
+cb = fig.colorbar(im, cax=cax, orientation='horizontal')
+cb.ax.tick_params(labelsize=fontsize)
+cax2 = fig.add_axes([0.1, 0.13, 0.8, 0.01])
+cb2 = fig.colorbar(im2, cax=cax2, orientation='horizontal')
+cb2.ax.tick_params(labelsize=fontsize)
+cax3 = fig.add_axes([0.1, 0.07, 0.8, 0.01])
+cb3 = fig.colorbar(im3, cax=cax3, orientation='horizontal')
+cb3.ax.tick_params(labelsize=fontsize)
+
+
+cb.set_label('Land type (% grid cell cover, subplots a, b)', fontsize = 26)
+cb2.set_label('LAI (subplot c)', fontsize = 26)
+# cb3.set_label('Dry season burned area (10$^{2}$ x % grid cell area, subplot d)', fontsize = 8)
+cb3.set_label('Dry season burned area (% grid cell area, subplot d)', fontsize = 26)
+
+# save figure
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/Land_surface_EGU.png', dpi = 300)

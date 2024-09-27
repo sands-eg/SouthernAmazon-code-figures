@@ -301,6 +301,38 @@ fig1.tight_layout()
 # save figure
 # fig1.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f05_vjan2024.pdf')
 # 
+
+# =============================================================================
+# EGU version
+# =============================================================================
+data = [lai_season, fire_season*100, isop_season, hcho_season, no2_season]#fire_season*100, 
+months = np.arange(1, 13)
+labels = ['LAI', 'Burned Area', 'Isoprene', 'HCHO', 'NO$_{2}$']#'Burned Area GFED4', 
+months_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',\
+                 'Oct', 'Nov', 'Dec']
+# months_labels2 = ['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov']
+
+fontsize = 24
+cm = 1/2.54
+fig1, ax1 = plt.subplots(figsize=(30*cm, 24*cm))
+for i in range(5):
+    ax1.plot(months, data[i][:,0]/data[i][:,0].max(), lw = 3, label = f'{labels[i]}')
+    # ax1.errorbar(months, data[i][:,0]/data[i][:,0].max(), data[i][:,1]/np.sqrt(data[i][:,2])/data[i][:,0].max(),\
+    #               linestyle = '--', capsize = 4, label = f'{labels[i]}')
+    ax1.fill_between(months, data[i][:,0]/data[i][:,0].max()-data[i][:,1]/np.sqrt(data[i][:,2])/data[i][:,0].max(), \
+                     data[i][:,0]/data[i][:,0].max()+data[i][:,1]/np.sqrt(data[i][:,2])/data[i][:,0].max(), alpha = 0.3)
+ax1.legend(loc='upper left', fontsize = fontsize, ncol = 3, framealpha = 0, handlelength = 0.6)
+ax1.set_ylabel('Proportion of max monthly mean', fontsize = fontsize)
+ax1.set_xlabel('Month', fontsize = fontsize)
+ax1.set_xticks(np.arange(1,13, 2))
+ax1.set_yticks(np.arange(0,1.3, 0.25))
+ax1.set_xticklabels(months_labels2, fontsize = fontsize)
+ax1.set_yticklabels(['0', '0.25', '0.5', '0.75', '1', '1.25'], fontsize = fontsize)
+fig1.tight_layout()
+# save figure
+# fig1.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/seasonal_EGU.png', dpi = 300)
+
+
 # fig1, ax1 = plt.subplots(figsize=(12, 8))
 # for i in range(6,8):
 #     ax1.plot(months, data[i][:,0], label = f'{labels[i]}')

@@ -76,8 +76,16 @@ def crop_data(var):
         50-70 degrees W, 5-25 degrees S'''
    
     ### Southern Amazon
-    mask_lon = (var.lon >= -70) & (var.lon <= -50)
-    mask_lat = (var.lat >= -25) & (var.lat <= -5)
+    # mask_lon = (var.lon >= -70) & (var.lon <= -50)
+    # mask_lat = (var.lat >= -25) & (var.lat <= -5)
+    
+    ### Congo?
+    # mask_lon = (var.lon >= 10) & (var.lon <= 30)
+    # mask_lat = (var.lat >= -20) & (var.lat <= 0)
+
+    ### SE Asia?
+    mask_lon = (var.lon >= 105) & (var.lon <= 125)
+    mask_lat = (var.lat >= -20) & (var.lat <= 0)
 
     var_crop = var.where(mask_lon & mask_lat, drop=True)
     return var_crop
@@ -247,9 +255,9 @@ fire1 = fire.fillna(0)/surface_area_earth *100
 # =============================================================================
 
 fire_crop = crop_data(fire1)
-lai_crop = crop_data(lai)
+# lai_crop = crop_data(lai)
 broadleaf_crop = crop_data(broadleaf)
-dem_crop = crop_data(dem)
+# dem_crop = crop_data(dem)
 
 no2_crop = crop_data(no2)
 
@@ -292,11 +300,11 @@ lc_labels = ['Broadleaf Forest']
 
 # lc_means = np.zeros((4, 10))
 
-elev_boundary = 1000
-high_elev = ma.masked_greater_equal(dem_crop, elev_boundary).mask
+# elev_boundary = 1000
+# high_elev = ma.masked_greater_equal(dem_crop, elev_boundary).mask
 
-atmos_dry = mask_high_elev(atmos_dry, high_elev) 
-atmos_wet = mask_high_elev(atmos_wet, high_elev)
+# atmos_dry = mask_high_elev(atmos_dry, high_elev) 
+# atmos_wet = mask_high_elev(atmos_wet, high_elev)
 
 for i, y in enumerate(lcs):
     lc = y
@@ -318,7 +326,7 @@ for i, y in enumerate(lcs):
     atmos_dry_slice = atmos_dry.sel(time=slice(min_year, max_year))
     atmos_wet_slice = atmos_wet.sel(time=slice(min_year, max_year))
     lc_slice = lc.sel(time=slice(min_year, max_year))
-    lai_slice = lai.sel(time=slice(min_year, max_year))
+    # lai_slice = lai.sel(time=slice(min_year, max_year))
     #lc_int = (np.rint(lc_slice*100)).astype(int)
     lc_int = np.rint(lc_slice) #if LC B used
     
@@ -334,10 +342,10 @@ for i, y in enumerate(lcs):
         for b in range(3):
             reshape_lc[a*3+b,:,:] = lc_int[a]
     
-    reshape_lai = np.zeros_like(atmos_dry_slice)
-    for a in range(lai_slice.shape[0]):
-        for b in range(3):
-            reshape_lai[a*3+b,:,:] = lai_slice[a]
+    # reshape_lai = np.zeros_like(atmos_dry_slice)
+    # for a in range(lai_slice.shape[0]):
+    #     for b in range(3):
+    #         reshape_lai[a*3+b,:,:] = lai_slice[a]
 # =============================================================================
 # get lat and lon as separate arrays
 # =============================================================================
@@ -364,7 +372,7 @@ atmos_wet_1d = atmos_wet_slice.values.ravel()
 atmos_dry_1d = atmos_dry_slice.values.ravel()
 # atmos_dry_1d = np.where(atmos_dry_1d < 10**17, atmos_dry_1d, np.nan) #for HCHO
 
-lai_1d = reshape_lai.ravel()
+# lai_1d = reshape_lai.ravel()
 
 lc_1d = reshape_lc.ravel()
 
@@ -374,7 +382,7 @@ lat_1d = reshape_lat.ravel()
 lon_1d = reshape_lon.ravel()
 
 # plt.scatter(lai_1d, atmos_dry_1d)
-# plt.scatter(lc_1d, atmos_dry_1d)
+plt.scatter(lc_1d, atmos_dry_1d)
 # plt.scatter(fire_1d, atmos_dry_1d)
 
 ### create pandas dataframe to hold data of interest
@@ -382,38 +390,38 @@ lon_1d = reshape_lon.ravel()
 # data_export = pd.DataFrame(for_export)
 # np.savetxt('C:/Users/s2261807/Documents/no2_burned_area.txt', data_export.values)
 
-data_log = {'Atmos': atmos_dry_1d, 'LC': lc_1d, 'LAI': lai_1d, 'Fire': fire_1d, \
-        'Atmos_log': np.log(atmos_dry_1d), 'Fire_log': np.log(fire_1d)}#, 'Atmos_sqrt': np.sqrt(atmos_dry_1d),\
+# data_log = {'Atmos': atmos_dry_1d, 'LC': lc_1d, 'LAI': lai_1d, 'Fire': fire_1d, \
+#         'Atmos_log': np.log(atmos_dry_1d), 'Fire_log': np.log(fire_1d)}#, 'Atmos_sqrt': np.sqrt(atmos_dry_1d),\
             # 'Fire_sqrt': np.sqrt(fire_1d), 'Lat' : lat_1d, 'Lon' : lon_1d} #, 'expFire': np.exp(fire_1d)}
 
-data = {'Atmos': atmos_dry_1d, 'Atmos_wet': atmos_wet_1d, 'LC': lc_1d, 'LAI': lai_1d}#,\
+data = {'Atmos': atmos_dry_1d, 'Atmos_wet': atmos_wet_1d, 'LC': lc_1d}#, 'LAI': lai_1d}#,\
         #'Fire': fire_1d, 'Fire_wet': fire_wet_1d, 'Lat' : lat_1d, 'Lon' : lon_1d}
     
 
 data_pd = pd.DataFrame(data).replace(-np.Inf, np.nan).dropna()
-data_log_pd = pd.DataFrame(data_log).replace(-np.Inf, np.nan).dropna()
+# data_log_pd = pd.DataFrame(data_log).replace(-np.Inf, np.nan).dropna()
 
 
 
 print(spearmanr(data_pd['Atmos'], data_pd['LC']))
-print(spearmanr(data_pd['Atmos'], data_pd['LAI']))
+# print(spearmanr(data_pd['Atmos'], data_pd['LAI']))
 # print(spearmanr(data_pd['Atmos'], data_pd['Fire']))
 # print(spearmanr(data_log_pd['Atmos_log'], data_log_pd['Fire_log']))
 
 ### OLS
-# Xi = data_pd['LC']
+Xi = data_pd['LC']
 # Xi = data_pd['LAI']
 # Xi = data_pd['Fire']
 # Xi = data_log_pd['Fire_log']
 # Xi = data_pd[['LC', 'Fire']]
 # Xi = data_pd[['Fire', 'LAI']]
-# y = data_pd['Atmos']
+y = data_pd['Atmos']
 # y = data_log_pd['Atmos_log']
-# X = sm.add_constant(Xi)
-# mod = sm.OLS(y, X)
-# res = mod.fit()
+X = sm.add_constant(Xi)
+mod = sm.OLS(y, X)
+res = mod.fit()
 
-# print(res.summary())
+print(res.summary())
 
 
 ### TS
@@ -422,7 +430,7 @@ print(spearmanr(data_pd['Atmos'], data_pd['LAI']))
 # print(score)
 
 # =============================================================================r
-# Isoprene regression figure
+# Isoprene regression figure - update values?
 # =============================================================================
 Xi_all = data_pd['LC']
 # Xi = data_pd[['LC', 'Fire']]
@@ -512,4 +520,46 @@ fig.tight_layout()
 # fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/isoprene_dry_season_regression.pdf')
 # fig.savefig(f'C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/{labels[atmos_no]}_dry_season_regression_summary_formatted_1col_OLS.pdf')
 # 
+###
+
+# =============================================================================r
+# EGU
+# =============================================================================
+Xi_all = data_pd['LC']
+# Xi = data_pd[['LC', 'Fire']]
+y_all = data_pd['Atmos']
+
+X_all = sm.add_constant(Xi_all)
+
+mod = sm.OLS(y_all, X_all)
+reg = mod.fit()
+# reg = OLS().fit(X, y)
+
+score = 0.59
+# score = reg.score(X_all, y_all)
+# print(score)
+y_pred_all = reg.predict(X_all)
+
+
+
+fontsize = 30
+cm = 1/2.54
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(30*cm, 20*cm))
+
+axes.scatter(Xi_all, y_all/10**16, s = 30, c = 'grey')
+axes.plot(Xi_all, y_pred_all/10**16, lw = 5, c ='navy')
+axes.set_ylabel(f'{labels[atmos_no]} \n{units[atmos_no]}', size = fontsize)
+axes.set_xlabel('Broadleaf Forest Cover %', size = fontsize)
+axes.tick_params(labelsize=fontsize)
+
+
+fig.text(0.15, 0.9, r'Isop = 1.12 $\times$ 10$^{14}$ $\times$ BFC $\plus$ 2.57 $\times$ 10$^{15}$', size = fontsize, c = 'navy') 
+fig.text(0.15, 0.8, f'R$^{2}$ = {score:.2f}', size = fontsize, c = 'navy')
+
+
+
+fig.tight_layout()
+# save figure
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/isop_reg_EGU.png', dpi = 300)
+
 ###

@@ -573,6 +573,8 @@ fire_spatial, fire_error = mean_error(fire_mask)
 # ax.legend(fontsize = 14)
 
 
+
+
 ## atm comp
 year_ticks = np.arange(2001, 2020, 5)
 data = [broadleaf_regional*100, sg_regional*100, lai_regional, fire_spatial, isop_spatial/10**15, \
@@ -590,7 +592,7 @@ labels = ['Broadleaf\nForest %', 'Savanna and\nGrassland %', 'LAI', 'Burned\nAre
               'CO\n10$^{17}$ mol cm$^{-2}$', 'NO$_{2}$\n10$^{15}$ mol cm$^{-2}$', 'AOD']
 alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
 cm =  1/2.54
-fontsize = 8
+fontsize = 8 
 fig, ax = plt.subplots(nrows=5, ncols=2, figsize=(12*cm,16*cm))
 ax = ax.ravel()
 for i in range(10):
@@ -612,5 +614,41 @@ fig.tight_layout()
 # ax.set_xticks(year_ticks)
 # ax.set_ylim(-200, 400)
 # fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/annual_through_time.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/annual_through_time_stderr.pdf')
+# 
+
+# =============================================================================
+# EGU version
+# =============================================================================
+year_ticks = np.arange(2001, 2020, 5)
+data = [broadleaf_regional*100, sg_regional*100] 
+errors = [broadleaf_error*100, sg_error*100] 
+
+years = [np.arange(2001, 2020), np.arange(2001, 2020)]
+labels = ['Broadleaf\nForest %', 'Savanna and\nGrassland %']
+alphabet = ['a', 'b']
+cm =  1/2.54
+fontsize = 28
+fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(42*cm,12*cm))
+ax = ax.ravel()
+for i in range(2):
+    ax[i].plot(years[i], data[i], label = f'{labels[i]}', lw = 3) 
+    ax[i].fill_between(years[i], data[i]-errors[i], \
+                      data[i]+errors[i], alpha = 0.3)
+    ax[i].set_ylabel(f'{labels[i]}', fontsize = fontsize)
+    ax[i].set_title(f'({alphabet[i]})', loc = 'left', fontsize = fontsize)
+    # ax[i].set_xlabel('Year', fontsize = 12)
+    ax[i].set_xlim(2001, 2020)
+    ax[i].set_xticks(year_ticks)
+    ax[i].set_yticks(np.arange(46, 55, 4))
+    ax[i].tick_params(axis='both', which='major', labelsize=24)
+    ax[i].set_xlabel('Year', fontsize = fontsize)
+
+# fig.suptitle('Wet season')
+fig.tight_layout()
+# year_ticks = np.arange(2001, 2020, 2)
+# ax.set_xticks(year_ticks)
+# ax.set_ylim(-200, 400)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/lc_through_time_EGU.png', dpi = 300)
 # fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/annual_through_time_stderr.pdf')
 # 

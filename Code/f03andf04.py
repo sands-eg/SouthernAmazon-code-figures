@@ -1034,11 +1034,11 @@ cb2.set_label('Methanol (ppbv)', fontsize = 7)
 cax3 = fig.add_axes([0.8, 0.05, 0.02, 0.25])
 cb3 = fig.colorbar(im3, cax=cax3, orientation='vertical', ticks=np.arange(0.5, 2.1, 0.5))
 cb3.ax.tick_params(labelsize=7)
-cb3.set_label('(Formaldehyde \n(10$^{16}$ molecules cm$^{-2}$)', fontsize = 7)
+cb3.set_label('Formaldehyde \n(10$^{16}$ molecules cm$^{-2}$)', fontsize = 7)
 
 # save figure
 # fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/biogenic_pcolormesh_vjan2024.png', dpi = 300)
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/biogenic_pcolormesh_vjan2024.pdf')
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f05_corrected_label.pdf')
 
 # =============================================================================
 # f04.png Carbon monoxide, AOD, NO2 seasonal maps - resized
