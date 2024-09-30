@@ -31,9 +31,14 @@ import seaborn as sns
 ### data
 
 # burned area (GFED 4; 2001-2016); error in metadata - unit is fraction of cell, not %
-fn = 'R:\\gfed\\monthly_1degree_sum_2001-2016.nc'
+# fn = 'R:\\gfed\\monthly_1degree_sum_2001-2016.nc'
+# ds = xr.open_dataset(fn, decode_times=True)
+# fire = ds['Burned area']*100 
+# fire['time'] = pd.date_range('2001-01-01', '2016-12-31', freq = 'MS')
+# ds.close()
+fn = 'R:\\gfed\\GFED4_BAkm2_2001-2016.nc'
 ds = xr.open_dataset(fn, decode_times=True)
-fire = ds['Burned area']*100 
+fire = ds['Burned Area']
 fire['time'] = pd.date_range('2001-01-01', '2016-12-31', freq = 'MS')
 ds.close()
 # burned area GFED5
@@ -92,24 +97,11 @@ ds.close()
 ### LC option B
 
 fn = 'R:\modis_lc\mcd12c1_1deg_igbp_percent_corrected.nc'
-ds = xr.open_dataset(fn, decode_times=False)
-grass_mosaic = ds['Land_Cover_Type_1_Percent'][:,:,:,10] + ds['Land_Cover_Type_1_Percent'][:,:,:,12] + ds['Land_Cover_Type_1_Percent'][:,:,:,14]
-grass_mosaic['time'] = pd.date_range('2001', '2020', freq = 'Y')
-ds.close()
-
-grass = grass_mosaic
-
-fn = 'R:\modis_lc\mcd12c1_1deg_igbp_percent_corrected.nc'
 ds = xr.open_dataset(fn, decode_times=True)
 broadleaf = ds['Land_Cover_Type_1_Percent'][:,:,:,2] + ds['Land_Cover_Type_1_Percent'][:,:,:,4] 
 broadleaf['time'] = pd.date_range('2001', '2020', freq = 'Y')
 ds.close()
 
-fn = 'R:\modis_lc\mcd12c1_1deg_igbp_percent_corrected.nc'
-ds = xr.open_dataset(fn, decode_times=False)
-savanna = ds['Land_Cover_Type_1_Percent'][:,:,:,8:10].sum(axis=3)
-savanna['time'] = pd.date_range('2001', '2020', freq = 'Y')
-ds.close()
 # =============================================================================
 # define functions
 # =============================================================================
@@ -219,7 +211,10 @@ def calc_statistic(data, stat = 'median'):
             data_means[i]=a.mean()
     elif stat == 'median':
         for i,a in enumerate(data):
-            data_means[i]=np.median(a)  
+            data_means[i]=np.median(a) 
+    elif stat == 'std':
+        for i,a in enumerate(data):
+            data_means[i] = a.std()
     else:
         print('invalid stat')
     
@@ -266,11 +261,13 @@ spatial_weights = surface_area_earth / np.max(surface_area_earth)
 spatial_weights = xr.DataArray(data = spatial_weights, coords = {"lat": fire.lat, "lon": fire.lon})
 
 fire2 = fire2.fillna(0)/surface_area_earth *100
+
+fire = fire.fillna(0)/surface_area_earth *100
 # =============================================================================
 # crop data to region of interest
 # =============================================================================
 
-fire_crop = crop_data(fire2)
+fire_crop = crop_data(fire)
 
 hcho_crop = crop_data(hcho)
 co_crop = crop_data(co)
@@ -280,8 +277,6 @@ isop_crop = crop_data(isop)
 methanol_crop = crop_data(methanol)
 
 broadleaf_crop = crop_data(broadleaf)
-savanna_crop = crop_data(savanna)
-grass_crop = crop_data(grass)
 
 dem_crop = crop_data(dem)
 # =============================================================================
@@ -405,143 +400,164 @@ lc_labels = ['Broadleaf forest']
 
 
 plot_data = []
+std_data = []
+len_data = []
 
-lcs = [broadleaf_crop, savanna_crop, grass_crop]
-lc_labels = ['Broadleaf forest', 'Savanna', 'Grasses and croplands']
-for j, y in enumerate(lcs):
-    lc = y
-    for i in range(1, 7):
-        atmos_no = i
-        if atmos_no == 1:
-            atmos_dry = isop_dry #aod_dry #no2_dry # co_dry #hcho_dry_d
-            atmos_wet = isop_wet #aod_wet # no2_wet # co_wet #hcho_wet_d
-        elif atmos_no == 2:
-            atmos_dry = methanol_dry
-            atmos_wet = methanol_wet         
-        elif atmos_no == 3:
-            atmos_dry = hcho_dry_d 
-            atmos_wet = hcho_wet_d 
-        elif atmos_no == 4:
-            atmos_dry = co_dry 
-            atmos_wet = co_wet 
-        elif atmos_no == 5:
-            atmos_dry = aod_dry #no2_dry # co_dry #hcho_dry_d
-            atmos_wet = aod_wet # no2_wet # co_wet #hcho_wet_d
-        elif atmos_no == 6:
-            atmos_dry = no2_dry # co_dry #hcho_dry_d
-            atmos_wet = no2_wet # co_wet #hcho_wet_d
-        else:
-            print('atmos_no is out of bounds (1 to 6)')
-            
-        lc_means = np.zeros((2, 10))
+for i in range(1, 7):
+    lc = broadleaf_crop
     
-        elev_boundary = 1000
-        high_elev = ma.masked_greater_equal(dem_crop, elev_boundary).mask
-    
-        atmos_dry = mask_high_elev(atmos_dry, high_elev) 
-        atmos_wet = mask_high_elev(atmos_wet, high_elev)
+    atmos_no = i
+    if atmos_no == 1:
+        atmos_dry = isop_dry #aod_dry #no2_dry # co_dry #hcho_dry_d
+        atmos_wet = isop_wet #aod_wet # no2_wet # co_wet #hcho_wet_d
+    elif atmos_no == 2:
+        atmos_dry = methanol_dry
+        atmos_wet = methanol_wet         
+    elif atmos_no == 3:
+        atmos_dry = hcho_dry_d 
+        atmos_wet = hcho_wet_d 
+    elif atmos_no == 4:
+        atmos_dry = co_dry 
+        atmos_wet = co_wet 
+    elif atmos_no == 5:
+        atmos_dry = aod_dry #no2_dry # co_dry #hcho_dry_d
+        atmos_wet = aod_wet # no2_wet # co_wet #hcho_wet_d
+    elif atmos_no == 6:
+        atmos_dry = no2_dry # co_dry #hcho_dry_d
+        atmos_wet = no2_wet # co_wet #hcho_wet_d
+    else:
+        print('atmos_no is out of bounds (1 to 6)')
         
-        ### keeping only data for months where both datasets are available
-        min_time = xr.DataArray(data = [fire_dry.time.min().values, atmos_dry.time.min().values]).max().values
-        min_year = min_time.astype(str).split('-')[0]
-        max_time = xr.DataArray(data = [fire_dry.time.max().values, atmos_dry.time.max().values]).min().values
-        max_year = max_time.astype(str).split('-')[0]
-        
-        fire_slice = fire_dry.sel(time=slice(min_year, max_year))
-        atmos_dry_slice = atmos_dry.sel(time=slice(min_year, max_year))
-        # atmos_wet_slice = atmos_wet.sel(time=slice(min_year, max_year))
-        lc_slice = lc.sel(time=slice(min_year, max_year))
-        #lc_int = (np.rint(lc_slice*100)).astype(int)
-        lc_int = np.rint(lc_slice) #if LC B used
-        
-        ### masking fire occurrence
-        boundary = 0.05#0.004
-        no_fire = ma.masked_less_equal(fire_slice, boundary).mask
-        yes_fire = ma.masked_greater(fire_slice, boundary).mask
-            
-        atmos_dry_fire, atmos_dry_no_fire = mask_data(atmos_dry_slice, yes_fire, no_fire)
-        
-        
-        # =============================================================================
-        # segregate data based on land cover percentage
-        # =============================================================================
-        reshape_lc = np.zeros_like(atmos_dry_slice)
-        for a in range(lc_int.shape[0]):
-            for b in range(3):
-                reshape_lc[a*3+b,:,:] = lc_int[a]
-                
-        # confirm array shapes match
-        if atmos_dry_fire.shape == reshape_lc.shape:
-            print('Array shapes match')
-        else:
-            print('Array shapes differ - cannot use land cover as mask')
-        
-        # dry season + fire
-        data1 = []
-        data1_len = []
-        
-        for p in range(10, 101, 10): # or 51 for urban
-            distribution_data = get_atm_dist(atmos_dry_fire, reshape_lc, p)
-            distribution_data = distribution_data[~np.isnan(distribution_data)]
-            data1.append(distribution_data)
-            data1_len.append(len(distribution_data))
-        
-        # # dry season no fire
-        # data2 = []
-        # data2_len = []
-        
-        # for p in range(10, 101, 10): # or 51 for urban
-        #     distribution_data = get_atm_dist(atmos_dry_no_fire, reshape_lc, p)
-        #     distribution_data = distribution_data[~np.isnan(distribution_data)]
-        #     data2.append(distribution_data)
-        #     data2_len.append(len(distribution_data))
-        
-        # dry season all
-        data3 = []
-        data3_len = []
-        
-        for p in range(10, 101, 10): # or 51 for urban
-            distribution_data = get_atm_dist(atmos_dry_slice, reshape_lc, p)
-            distribution_data = distribution_data[~np.isnan(distribution_data)]
-            data3.append(distribution_data)
-            data3_len.append(len(distribution_data))
-        
-        # # wet season all
-        # data4 = []
-        # data4_len = []
-        
-        # for p in range(10, 101, 10): # or 51 for urban
-        #     distribution_data = get_atm_dist(atmos_wet_slice, reshape_lc, p)
-        #     distribution_data = distribution_data[~np.isnan(distribution_data)]
-        #     data4.append(distribution_data)
-        #     data4_len.append(len(distribution_data))
-        
-        
-        # =============================================================================
-        # calculate median (or other statistic) for each season/burned area/land cover bracket - add area weighting????
-        # =============================================================================
-            
-        data1_means = calc_statistic(data1, stat='mean')
-        # data2_means = calc_statistic(data2, stat='mean')
-        data3_means = calc_statistic(data3, stat='mean')
-        # data4_means = calc_statistic(data4, stat='mean')
-        
-        data1_cover = np.zeros(10)
-        for l in range(10):
-            data1_cover[l] = data1_len[l] /data3_len[l]
-        
-        data1_weighted = (data1_means * data1_len / data3_len ) / data3_means #- data1_cover
-        # data2_weighted = data2_means * data2_len / data3_len
-        
-        
-        plot_data.append(data1_weighted)
+    lc_means = np.zeros((4, 10))
 
-tmp_isop = np.stack((plot_data[0], plot_data[6], plot_data[12]))
-tmp_met = np.stack((plot_data[1], plot_data[7], plot_data[13]))
-tmp_hcho = np.stack((plot_data[2], plot_data[8], plot_data[14]))
-tmp_co = np.stack((plot_data[3], plot_data[9], plot_data[15]))
-tmp_aod = np.stack((plot_data[4], plot_data[10], plot_data[16]))
-tmp_no2 = np.stack((plot_data[5], plot_data[11], plot_data[17]))
+    elev_boundary = 1000
+    high_elev = ma.masked_greater_equal(dem_crop, elev_boundary).mask
+
+    atmos_dry = mask_high_elev(atmos_dry, high_elev) 
+    atmos_wet = mask_high_elev(atmos_wet, high_elev)
+    
+    ### keeping only data for months where both datasets are available
+    min_time = xr.DataArray(data = [fire_dry.time.min().values, atmos_dry.time.min().values]).max().values
+    min_year = min_time.astype(str).split('-')[0]
+    max_time = xr.DataArray(data = [fire_dry.time.max().values, atmos_dry.time.max().values]).min().values
+    max_year = max_time.astype(str).split('-')[0]
+    
+    fire_slice = fire_dry.sel(time=slice(min_year, max_year))
+    atmos_dry_slice = atmos_dry.sel(time=slice(min_year, max_year))
+    atmos_wet_slice = atmos_wet.sel(time=slice(min_year, max_year))
+    lc_slice = lc.sel(time=slice(min_year, max_year))
+    #lc_int = (np.rint(lc_slice*100)).astype(int)
+    lc_int = np.rint(lc_slice) #if LC B used
+    
+    ### masking fire occurrence
+    boundary = 0.04#0.004
+    no_fire = ma.masked_less_equal(fire_slice, boundary).mask
+    yes_fire = ma.masked_greater(fire_slice, boundary).mask
+        
+    atmos_dry_fire, atmos_dry_no_fire = mask_data(atmos_dry_slice, yes_fire, no_fire)
+    
+    
+    # =============================================================================
+    # segregate data based on land cover percentage
+    # =============================================================================
+    reshape_lc = np.zeros_like(atmos_dry_slice)
+    for a in range(lc_int.shape[0]):
+        for b in range(3):
+            reshape_lc[a*3+b,:,:] = lc_int[a]
+            
+    # confirm array shapes match
+    if atmos_dry_fire.shape == reshape_lc.shape:
+        print('Array shapes match')
+    else:
+        print('Array shapes differ - cannot use land cover as mask')
+    
+    # dry season + fire
+    data1 = []
+    data1_len = []
+    
+    for p in range(10, 101, 10): # or 51 for urban
+        distribution_data = get_atm_dist(atmos_dry_fire, reshape_lc, p)
+        distribution_data = distribution_data[~np.isnan(distribution_data)]
+        data1.append(distribution_data)
+        data1_len.append(len(distribution_data))
+    
+    # dry season no fire
+    data2 = []
+    data2_len = []
+    
+    for p in range(10, 101, 10): # or 51 for urban
+        distribution_data = get_atm_dist(atmos_dry_no_fire, reshape_lc, p)
+        distribution_data = distribution_data[~np.isnan(distribution_data)]
+        data2.append(distribution_data)
+        data2_len.append(len(distribution_data))
+    
+    # dry season all
+    data3 = []
+    data3_len = []
+    
+    for p in range(10, 101, 10): # or 51 for urban
+        distribution_data = get_atm_dist(atmos_dry_slice, reshape_lc, p)
+        distribution_data = distribution_data[~np.isnan(distribution_data)]
+        data3.append(distribution_data)
+        data3_len.append(len(distribution_data))
+    
+    # wet season all
+    data4 = []
+    data4_len = []
+    
+    for p in range(10, 101, 10): # or 51 for urban
+        distribution_data = get_atm_dist(atmos_wet_slice, reshape_lc, p)
+        distribution_data = distribution_data[~np.isnan(distribution_data)]
+        data4.append(distribution_data)
+        data4_len.append(len(distribution_data))
+    
+    
+    # =============================================================================
+    # calculate median (or other statistic) for each season/burned area/land cover bracket
+    # =============================================================================
+        
+    data1_means = calc_statistic(data1, stat='mean')
+    data2_means = calc_statistic(data2, stat='mean')
+    data3_means = calc_statistic(data3, stat='mean')
+    data4_means = calc_statistic(data4, stat='mean')
+    
+    data1_stds = calc_statistic(data1, stat='std')
+    data2_stds = calc_statistic(data2, stat='std')
+    data3_stds = calc_statistic(data3, stat='std')
+    data4_stds = calc_statistic(data4, stat='std')
+    
+    # data_means = [data1_means, data3_means, data2_means, data4_means]
+    
+    # data1_weighted = data1_means * data1_len / data3_len
+    # data2_weighted = data2_means * data2_len / data3_len
+    
+    data =[data1_means, data2_means, data3_means, data4_means]
+    
+    data_std = [data1_stds, data2_stds, data3_stds, data4_stds]
+    
+    data_len = [data1_len, data2_len, data3_len, data4_len]
+    
+    stds_array = np.zeros((4, 10))
+    len_array = np.zeros((4,10))
+    
+    for x in range(4):
+        lc_means[x,:] = data[x] 
+        stds_array[x, :] = data_std[x]
+        len_array[x, :] = data_len[x]
+    
+    plot_data.append(lc_means)
+    std_data.append(stds_array)
+    len_data.append(len_array)
+
+plot_data[0] = plot_data[0]/10**16
+plot_data[2] = plot_data[2]/10**16
+plot_data[5] = plot_data[5]/10**15
+
+std_data[0] = std_data[0]/10**16
+std_data[2] = std_data[2]/10**16
+std_data[5] = std_data[5]/10**15
+
+err_data = std_data/np.sqrt(len_data)
 
 # # =============================================================================
 # # heatmap plot
@@ -569,109 +585,72 @@ tmp_no2 = np.stack((plot_data[5], plot_data[11], plot_data[17]))
 # =============================================================================
 # broadleaf heatmaps for all 6 species
 # =============================================================================
-plot_data = [tmp_isop, tmp_met, tmp_hcho, tmp_co, tmp_aod, tmp_no2]
 
 labels = {1 : 'Isoprene', 2 :  'Methanol', 3 : 'HCHO', 4 : 'CO', 5 : 'AOD', 6 : 'NO$_{2}$'}
 
 units = {1 : '(10$^{16}$ molecules cm$^{-2}$)', 2 : '(ppbv)', 3 : '(10$^{16}$ molecules cm$^{-2}$)', 4 : '(10$^{17}$ molecules cm$^{-2}$)',\
-          5 : 'at 0.47 $\mu$m', 6 : '(10$^{15}$ molecules cm$^{-2}$)'}
+         5 : 'at 0.47 $\mu$m', 6 : '(10$^{15}$ molecules cm$^{-2}$)'}
 
 
 alphabet = ['a', 'b', 'c', 'd', 'e', 'f',]
-categories = ['F', 'S', 'G']
+categories = ['H', 'L', 'D', 'W']
 cm = 1/2.54
-fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 18*cm))
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 14*cm))
 axes = axes.ravel()
-cax1 = fig.add_axes([0.05, 0.10, 0.9, 0.02])
 
 for i in range(6):
-    axes[i].set_title(f'({alphabet[i]}) {labels[i+1]}', fontsize = 10)
-    if i == 5:
-    
-        sns.heatmap(plot_data[i]*100,  cmap='seismic', vmin=0, vmax=100,  ax = axes[i],\
-                    cbar_ax = cax1, cbar_kws = {'orientation' : 'horizontal'}) #'label':f'{labels[i+1]} {units[i+1]}', cbar_kws = {'location':'bottom'}, 
-        cbar = axes[i].collections[0].colorbar
-        cbar.ax.tick_params(labelsize=8)
-        cbar.set_label('Proportion of regional mean from high fire grid cells (%)', fontsize = 8)
-    else:
-        sns.heatmap(plot_data[i]*100,  cmap='seismic', vmin=0, vmax=100,  ax = axes[i], cbar = False)
-    #cbar_kws = {'label':f'{labels[i+1]} {units[i+1]}', 'location':'bottom'}
-    # axes[i].text(-2, 0, f'({alphabet[i]})', fontsize = 10)
+    sns.heatmap(plot_data[i],  cmap='YlGnBu', ax = axes[i], cbar_kws = {'label':f'{labels[i+1]} {units[i+1]}',\
+                                                                        'location':'right'})
+    axes[i].text(-2, 0, f'({alphabet[i]})', fontsize = 10)
     axes[i].set_yticklabels(categories, fontsize=8)
     axes[i].set_xlim(0,10)
     axes[i].set_xticks(np.arange(2,11, 2))
-    axes[i].set_xticklabels(range(20,101, 20), fontsize = 8)
-    axes[i].set_xlabel('Land type cover (%)', fontsize = 8)
-    # cbar = axes[i].collections[0].colorbar
-    # cbar.ax.tick_params(labelsize=8)
-    # cbar.set_label(f'{labels[i+1]} {units[i+1]}', fontsize = 8)
-
-# add colorbars
-# im1 = sns.heatmap(plot_data[0]*100,  cmap='seismic', vmin=0, vmax=100, cbar = True)
-# cax1 = fig.add_axes([0.13, 0.20, 0.8, 0.01])
-# cb1 = fig.colorbar(im1, cax=cax1, orientation='horizontal')
-# cb1.ax.tick_params(labelsize=8)
-# cb1.set_label('(a), (b): Isoprene (molecules cm$^{-2}$)', fontsize = 8)
+    axes[i].set_xticklabels(range(20,101, 20), fontsize = 7)
+    axes[i].set_xlabel('Broadleaf forest cover (%)', fontsize = 8)
+    cbar = axes[i].collections[0].colorbar
+    cbar.ax.tick_params(labelsize=7)
+    cbar.set_label(f'{labels[i+1]} \n{units[i+1]}', fontsize = 8)
 
 
 fig.tight_layout()
-fig.subplots_adjust(bottom=0.2)
+# fig.subplots_adjust(bottom=0.25)
 
 
 # save figure
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f07.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f06_resized_GFED4corr.png', dpi = 300)
 
 # =============================================================================
-# broadleaf heatmaps for all 6 species - resized
+# std plot
 # =============================================================================
-plot_data = [tmp_isop, tmp_met, tmp_hcho, tmp_co, tmp_aod, tmp_no2]
-
 labels = {1 : 'Isoprene', 2 :  'Methanol', 3 : 'HCHO', 4 : 'CO', 5 : 'AOD', 6 : 'NO$_{2}$'}
 
 units = {1 : '(10$^{16}$ molecules cm$^{-2}$)', 2 : '(ppbv)', 3 : '(10$^{16}$ molecules cm$^{-2}$)', 4 : '(10$^{17}$ molecules cm$^{-2}$)',\
-          5 : 'at 0.47 $\mu$m', 6 : '(10$^{15}$ molecules cm$^{-2}$)'}
+         5 : 'at 0.47 $\mu$m', 6 : '(10$^{15}$ molecules cm$^{-2}$)'}
 
 
 alphabet = ['a', 'b', 'c', 'd', 'e', 'f',]
-categories = ['F', 'S', 'G']
+categories = ['H', 'L', 'D', 'W']
 cm = 1/2.54
-fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 15*cm))
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12*cm, 14*cm))
 axes = axes.ravel()
-cax1 = fig.add_axes([0.05, 0.10, 0.9, 0.02])
 
 for i in range(6):
-    axes[i].set_title(f'({alphabet[i]}) {labels[i+1]}', fontsize = 10)
-    if i == 5:
-    
-        sns.heatmap(plot_data[i]*100,  cmap='seismic', vmin=0, vmax=100,  ax = axes[i],\
-                    cbar_ax = cax1, cbar_kws = {'orientation' : 'horizontal'}) #'label':f'{labels[i+1]} {units[i+1]}', cbar_kws = {'location':'bottom'}, 
-        cbar = axes[i].collections[0].colorbar
-        cbar.ax.tick_params(labelsize=8)
-        cbar.set_label('Proportion of regional mean from high fire grid cells (%)', fontsize = 8)
-    else:
-        sns.heatmap(plot_data[i]*100,  cmap='seismic', vmin=0, vmax=100,  ax = axes[i], cbar = False)
-    #cbar_kws = {'label':f'{labels[i+1]} {units[i+1]}', 'location':'bottom'}
-    # axes[i].text(-2, 0, f'({alphabet[i]})', fontsize = 10)
+    sns.heatmap(std_data[i],  cmap='YlGnBu', ax = axes[i], cbar_kws = {'label':f'{labels[i+1]} {units[i+1]}',\
+                                                                        'location':'right'})
+    axes[i].text(-2, 0, f'({alphabet[i]})', fontsize = 10)
     axes[i].set_yticklabels(categories, fontsize=8)
     axes[i].set_xlim(0,10)
     axes[i].set_xticks(np.arange(2,11, 2))
-    axes[i].set_xticklabels(range(20,101, 20), fontsize = 8)
-    axes[i].set_xlabel('Land type cover (%)', fontsize = 8)
-    # cbar = axes[i].collections[0].colorbar
-    # cbar.ax.tick_params(labelsize=8)
-    # cbar.set_label(f'{labels[i+1]} {units[i+1]}', fontsize = 8)
-
-# add colorbars
-# im1 = sns.heatmap(plot_data[0]*100,  cmap='seismic', vmin=0, vmax=100, cbar = True)
-# cax1 = fig.add_axes([0.13, 0.20, 0.8, 0.01])
-# cb1 = fig.colorbar(im1, cax=cax1, orientation='horizontal')
-# cb1.ax.tick_params(labelsize=8)
-# cb1.set_label('(a), (b): Isoprene (molecules cm$^{-2}$)', fontsize = 8)
+    axes[i].set_xticklabels(range(20,101, 20), fontsize = 7)
+    axes[i].set_xlabel('Broadleaf forest cover (%)', fontsize = 8)
+    cbar = axes[i].collections[0].colorbar
+    cbar.ax.tick_params(labelsize=7)
+    cbar.set_label(f'{labels[i+1]} \n{units[i+1]}', fontsize = 8)
 
 
 fig.tight_layout()
-fig.subplots_adjust(bottom=0.2)
+# fig.subplots_adjust(bottom=0.25)
 
 
 # save figure
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f07_resized_gfed5_b05.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/f06_std resized.png', dpi = 300)
