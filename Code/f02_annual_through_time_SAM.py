@@ -400,44 +400,97 @@ sg_regional, sg_error = mean_error_lc(sg_mask)
 lai_regional, lai_error = mean_error_lc(lai_mask)
 
 def mean_error(atmos):
+    # Verify the presence of the time dimension
+    if 'time' not in atmos.dims:
+        raise ValueError("'atmos' DataArray does not have a 'time' dimension")
+
     atmos_1d = atmos.values.ravel()
     time_atmos = np.unique(atmos.time.dt.year.values)
 
-    reshape_weights = np.zeros_like(atmos)
-    for a in range(atmos.shape[0]):
-        reshape_weights[a,:,:] = weights_crop
-    w1_1d = reshape_weights.ravel()
-    
+    # Calculate the spatial weights
+    reshape_weights = np.broadcast_to(weights_crop, atmos.shape).ravel()
+    w1_1d = reshape_weights
+
+    # Calculate weights by month length and normalize by year
     month_length = atmos.time.dt.days_in_month
-    wgts = month_length.groupby("time.year") / month_length.groupby("time.year").sum()
-    
-    reshape_weights = np.zeros_like(atmos)
-    for a in range(atmos.shape[0]):
-        reshape_weights[a,:,:] = wgts[a]
-    w2_1d = reshape_weights.ravel()
-    
-    reshape_time = np.zeros_like(atmos)
-    for a in range(atmos.shape[0]):
-        reshape_time[a,:,:] = atmos.time.dt.year.values[a]
-    time_1d = reshape_time.ravel()
-    
-    data = {'var': atmos_1d, 'time': time_1d, 'w1': w1_1d, 'w2':w2_1d}
+    if 'year' not in month_length.coords:
+        month_length = month_length.assign_coords(year=month_length.time.dt.year)
+
+    annual_month_sum = month_length.groupby("year").sum()
+    wgts = month_length / annual_month_sum.sel(year=month_length.time.dt.year)
+
+    # Broadcast weights to match the data dimensions
+    reshape_wgts = np.broadcast_to(wgts.values[:, np.newaxis, np.newaxis], atmos.shape).ravel()
+    w2_1d = reshape_wgts
+
+    # Yearly time values
+    time_1d = np.repeat(atmos.time.dt.year.values[:, np.newaxis, np.newaxis], atmos.shape[1] * atmos.shape[2], axis=1).ravel()
+
+    # Structure data for DataFrame
+    data = {'var': atmos_1d, 'time': time_1d, 'w1': w1_1d, 'w2': w2_1d}
     pd_data = pd.DataFrame(data).dropna()
-    
-    atmos_regional = np.zeros_like(time_atmos, dtype = 'float')
-    atmos_error = np.zeros_like(time_atmos, dtype = 'float')
+
+    atmos_regional = np.zeros_like(time_atmos, dtype='float')
+    atmos_error = np.zeros_like(time_atmos, dtype='float')
+
+    # Iterate over each year
     for i, y in enumerate(time_atmos):
         annual_pd = pd_data[pd_data['time'] == y]
-        w_mean = (annual_pd['var']*(annual_pd['w1']+annual_pd['w2'])).sum() / (annual_pd['w1'].sum() + annual_pd['w2'].sum())
-        std = np.sqrt(np.average((annual_pd['var'] - w_mean)**2, weights=annual_pd['w1']+annual_pd['w2'])) #pd_data.std()['var'] # annual_pd['var'] - w_mean
+        w_mean = (annual_pd['var'] * (annual_pd['w1'] + annual_pd['w2'])).sum() / (annual_pd['w1'].sum() + annual_pd['w2'].sum())
+        std = np.sqrt(np.average((annual_pd['var'] - w_mean) ** 2, weights=annual_pd['w1'] + annual_pd['w2']))
         count = len(annual_pd['var'])
-        # print(count)
+
         atmos_regional[i] = w_mean
         atmos_error[i] = std / np.sqrt(count)
-        # atmos_error[i] = std
-        
+
     return atmos_regional, atmos_error
 
+
+
+
+
+# def mean_error(atmos):
+#     atmos_1d = atmos.values.ravel()
+#     time_atmos = np.unique(atmos.time.dt.year.values)
+
+#     reshape_weights = np.zeros_like(atmos)
+#     for a in range(atmos.shape[0]):
+#         reshape_weights[a,:,:] = weights_crop
+#     w1_1d = reshape_weights.ravel()
+    
+#     month_length = atmos.time.dt.days_in_month
+#     wgts = month_length.groupby("time.year") / month_length.groupby("time.year").sum()#.groupby("time.year")
+    
+#     reshape_weights = np.zeros_like(atmos)
+#     for a in range(atmos.shape[0]):
+#         reshape_weights[a,:,:] = wgts[a]
+#     w2_1d = reshape_weights.ravel()
+    
+#     reshape_time = np.zeros_like(atmos)
+#     for a in range(atmos.shape[0]):
+#         reshape_time[a,:,:] = atmos.time.dt.year.values[a]
+#     time_1d = reshape_time.ravel()
+    
+#     data = {'var': atmos_1d, 'time': time_1d, 'w1': w1_1d, 'w2':w2_1d}
+#     pd_data = pd.DataFrame(data).dropna()
+    
+#     atmos_regional = np.zeros_like(time_atmos, dtype = 'float')
+#     atmos_error = np.zeros_like(time_atmos, dtype = 'float')
+#     for i, y in enumerate(time_atmos):
+#         annual_pd = pd_data[pd_data['time'] == y]
+#         w_mean = (annual_pd['var']*(annual_pd['w1']+annual_pd['w2'])).sum() / (annual_pd['w1'].sum() + annual_pd['w2'].sum())
+#         std = np.sqrt(np.average((annual_pd['var'] - w_mean)**2, weights=annual_pd['w1']+annual_pd['w2'])) #pd_data.std()['var'] # annual_pd['var'] - w_mean
+#         count = len(annual_pd['var'])
+#         # print(count)
+#         atmos_regional[i] = w_mean
+#         atmos_error[i] = std / np.sqrt(count)
+#         # atmos_error[i] = std
+        
+#     return atmos_regional, atmos_error
+
+
+
+######################################################################
 
 hcho_spatial, hcho_error = mean_error(hcho_elev)
 co_spatial, co_error = mean_error(co_elev)
@@ -448,6 +501,166 @@ no2_spatial, no2_error = mean_error(no2_elev)
 
 fire_spatial, fire_error = mean_error(fire_mask)
 
+
+
+
+## atm comp
+year_ticks = np.arange(2001, 2020, 5)
+data = [broadleaf_regional*100, sg_regional*100, lai_regional, fire_spatial, isop_spatial/10**15, \
+        methanol_spatial, hcho_spatial/10**16, co_spatial, no2_spatial/10**15, aod_spatial] 
+errors = [broadleaf_error*100, sg_error*100, lai_error, fire_error, isop_error/10**15, methanol_error, hcho_error/10**16, co_error, no2_error/10**15, aod_error] 
+
+# data_dry = [broadleaf_regional*100, lai_regional, fire_regional, isop_dry_spatial, methanol_dry_spatial, hcho_dry_spatial, aod_dry_spatial, co_dry_spatial, no2_dry_spatial] 
+# data_wet = [broadleaf_regional*100, lai_regional, fire_regional, isop_wet_spatial, methanol_wet_spatial, hcho_wet_spatial, aod_wet_spatial, co_wet_spatial, no2_wet_spatial] 
+
+years = [np.arange(2001, 2020), np.arange(2001, 2020), np.arange(2001, 2020), np.arange(2001, 2017), \
+         np.arange(2012, 2021), np.arange(2008, 2019), np.arange(2005, 2019),\
+         np.arange(2001, 2020), np.arange(2005, 2021), np.arange(2001, 2020)]
+labels = ['Broadleaf\nForest %', 'Savanna and\nGrassland %', 'LAI', 'Burned\nArea km$^{2}$', \
+          'Isoprene\n10$^{15}$ molec cm$^{-2}$', 'Methanol\nppbv', 'HCHO\n10$^{16}$ molec cm$^{-2}$', \
+              'CO\n10$^{17}$ molec cm$^{-2}$', 'NO$_{2}$\n10$^{15}$ molec cm$^{-2}$', 'AOD']
+alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+cm =  1/2.54
+fontsize = 8 
+fig, ax = plt.subplots(nrows=5, ncols=2, figsize=(12*cm,16*cm))
+ax = ax.ravel()
+for i in range(10):
+    ax[i].plot(years[i], data[i], label = f'{labels[i]}') 
+    ax[i].fill_between(years[i], data[i]-errors[i], \
+                      data[i]+errors[i], alpha = 0.3)
+    ax[i].set_ylabel(f'{labels[i]}', fontsize = fontsize)
+    ax[i].set_title(f'({alphabet[i]})', loc = 'left', fontsize = fontsize)
+    # ax[i].set_xlabel('Year', fontsize = 12)
+    ax[i].set_xlim(2001, 2020)
+    ax[i].set_xticks(year_ticks)
+    ax[i].tick_params(axis='both', which='major', labelsize=fontsize)
+    if i ==8 or i == 9:
+        ax[i].set_xlabel('Year', fontsize = fontsize)
+
+# fig.suptitle('Wet season')
+fig.tight_layout()
+# year_ticks = np.arange(2001, 2020, 2)
+# ax.set_xticks(year_ticks)
+# ax.set_ylim(-200, 400)
+fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/annual_through_time_test.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/annual_through_time_stderr.pdf')
+# 
+
+
+
+## atm comp
+year_ticks = np.arange(2001, 2020, 5)
+data = [broadleaf_regional*100, sg_regional*100, lai_regional, fire_spatial, isop_spatial/10**15, \
+        methanol_spatial, hcho_spatial/10**16, co_spatial, no2_spatial/10**15, aod_spatial] 
+errors = [broadleaf_error*100, sg_error*100, lai_error, fire_error, isop_spatial*0.3/10**15, methanol_spatial*0.4, hcho_spatial*0.5/10**16, co_spatial*0.2, 1+no2_spatial*0.25/10**15, aod_spatial*0.2+0.05] 
+
+# data_dry = [broadleaf_regional*100, lai_regional, fire_regional, isop_dry_spatial, methanol_dry_spatial, hcho_dry_spatial, aod_dry_spatial, co_dry_spatial, no2_dry_spatial] 
+# data_wet = [broadleaf_regional*100, lai_regional, fire_regional, isop_wet_spatial, methanol_wet_spatial, hcho_wet_spatial, aod_wet_spatial, co_wet_spatial, no2_wet_spatial] 
+
+years = [np.arange(2001, 2020), np.arange(2001, 2020), np.arange(2001, 2020), np.arange(2001, 2017), \
+         np.arange(2012, 2021), np.arange(2008, 2019), np.arange(2005, 2019),\
+         np.arange(2001, 2020), np.arange(2005, 2021), np.arange(2001, 2020)]
+labels = ['Broadleaf\nForest %', 'Savanna and\nGrassland %', 'LAI', 'Burned\nArea km$^{2}$', \
+          'Isoprene\n10$^{15}$ molec cm$^{-2}$', 'Methanol\nppbv', 'HCHO\n10$^{16}$ molec cm$^{-2}$', \
+              'CO\n10$^{17}$ molec cm$^{-2}$', 'NO$_{2}$\n10$^{15}$ molec cm$^{-2}$', 'AOD']
+alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+cm =  1/2.54
+fontsize = 8 
+fig, ax = plt.subplots(nrows=5, ncols=2, figsize=(12*cm,16*cm))
+ax = ax.ravel()
+for i in range(10):
+    ax[i].plot(years[i], data[i], label = f'{labels[i]}') 
+    ax[i].fill_between(years[i], data[i]-errors[i], \
+                      data[i]+errors[i], alpha = 0.3)
+    ax[i].set_ylabel(f'{labels[i]}', fontsize = fontsize)
+    ax[i].set_title(f'({alphabet[i]})', loc = 'left', fontsize = fontsize)
+    # ax[i].set_xlabel('Year', fontsize = 12)
+    ax[i].set_xlim(2001, 2020)
+    ax[i].set_xticks(year_ticks)
+    ax[i].tick_params(axis='both', which='major', labelsize=fontsize)
+    if i ==8 or i == 9:
+        ax[i].set_xlabel('Year', fontsize = fontsize)
+
+# fig.suptitle('Wet season')
+fig.tight_layout()
+# year_ticks = np.arange(2001, 2020, 2)
+# ax.set_xticks(year_ticks)
+# ax.set_ylim(-200, 400)
+fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/annual_through_time_test.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/annual_through_time_stderr.pdf')
+# 
+# =============================================================================
+# EGU version
+# =============================================================================
+year_ticks = np.arange(2001, 2020, 5)
+data = [broadleaf_regional*100, sg_regional*100] 
+errors = [broadleaf_error*100, sg_error*100] 
+
+years = [np.arange(2001, 2020), np.arange(2001, 2020)]
+labels = ['Broadleaf\nForest %', 'Savanna and\nGrassland %']
+alphabet = ['a', 'b']
+cm =  1/2.54
+fontsize = 28
+fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(42*cm,12*cm))
+ax = ax.ravel()
+for i in range(2):
+    ax[i].plot(years[i], data[i], label = f'{labels[i]}', lw = 3) 
+    ax[i].fill_between(years[i], data[i]-errors[i], \
+                      data[i]+errors[i], alpha = 0.3)
+    ax[i].set_ylabel(f'{labels[i]}', fontsize = fontsize)
+    ax[i].set_title(f'({alphabet[i]})', loc = 'left', fontsize = fontsize)
+    # ax[i].set_xlabel('Year', fontsize = 12)
+    ax[i].set_xlim(2001, 2020)
+    ax[i].set_xticks(year_ticks)
+    ax[i].set_yticks(np.arange(46, 55, 4))
+    ax[i].tick_params(axis='both', which='major', labelsize=24)
+    ax[i].set_xlabel('Year', fontsize = fontsize)
+
+# fig.suptitle('Wet season')
+fig.tight_layout()
+# year_ticks = np.arange(2001, 2020, 2)
+# ax.set_xticks(year_ticks)
+# ax.set_ylim(-200, 400)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/lc_through_time_EGU.png', dpi = 300)
+# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/annual_through_time_stderr.pdf')
+# 
+
+
+# atmos_1d = hcho_elev.values.ravel()
+# time_atmos = np.unique(hcho_elev.time.dt.year.values)
+
+# reshape_weights = np.zeros_like(hcho_elev)
+# for a in range(hcho_elev.shape[0]):
+#     reshape_weights[a,:,:] = weights_crop
+# w1_1d = reshape_weights.ravel()
+
+# month_length = hcho_elev.time.dt.days_in_month
+# wgts = month_length / month_length.groupby("time.year").sum()
+
+# reshape_weights = np.zeros_like(atmos)
+# for a in range(atmos.shape[0]):
+#     reshape_weights[a,:,:] = wgts[a]
+# w2_1d = reshape_weights.ravel()
+
+# reshape_time = np.zeros_like(atmos)
+# for a in range(atmos.shape[0]):
+#     reshape_time[a,:,:] = atmos.time.dt.year.values[a]
+# time_1d = reshape_time.ravel()
+
+# data = {'var': atmos_1d, 'time': time_1d, 'w1': w1_1d, 'w2':w2_1d}
+# pd_data = pd.DataFrame(data).dropna()
+
+# atmos_regional = np.zeros_like(time_atmos, dtype = 'float')
+# atmos_error = np.zeros_like(time_atmos, dtype = 'float')
+# for i, y in enumerate(time_atmos):
+#     annual_pd = pd_data[pd_data['time'] == y]
+#     w_mean = (annual_pd['var']*(annual_pd['w1']+annual_pd['w2'])).sum() / (annual_pd['w1'].sum() + annual_pd['w2'].sum())
+#     std = np.sqrt(np.average((annual_pd['var'] - w_mean)**2, weights=annual_pd['w1']+annual_pd['w2'])) #pd_data.std()['var'] # annual_pd['var'] - w_mean
+#     count = len(annual_pd['var'])
+#     # print(count)
+#     atmos_regional[i] = w_mean
+#     atmos_error[i] = std / np.sqrt(count)
+#     # atmos_error[i] = std
 # # =============================================================================
 # # Get annual fire sum
 # # =============================================================================
@@ -572,83 +785,4 @@ fire_spatial, fire_error = mean_error(fire_mask)
 # ax.set_xlabel('Year', fontsize = 16)
 # ax.legend(fontsize = 14)
 
-
-
-
-## atm comp
-year_ticks = np.arange(2001, 2020, 5)
-data = [broadleaf_regional*100, sg_regional*100, lai_regional, fire_spatial, isop_spatial/10**15, \
-        methanol_spatial, hcho_spatial/10**16, co_spatial, no2_spatial/10**15, aod_spatial] 
-errors = [broadleaf_error*100, sg_error*100, lai_error, fire_error, isop_error/10**15, methanol_error, hcho_error/10**16, co_error, no2_error/10**15, aod_error] 
-
-# data_dry = [broadleaf_regional*100, lai_regional, fire_regional, isop_dry_spatial, methanol_dry_spatial, hcho_dry_spatial, aod_dry_spatial, co_dry_spatial, no2_dry_spatial] 
-# data_wet = [broadleaf_regional*100, lai_regional, fire_regional, isop_wet_spatial, methanol_wet_spatial, hcho_wet_spatial, aod_wet_spatial, co_wet_spatial, no2_wet_spatial] 
-
-years = [np.arange(2001, 2020), np.arange(2001, 2020), np.arange(2001, 2020), np.arange(2001, 2017), \
-         np.arange(2012, 2021), np.arange(2008, 2019), np.arange(2005, 2019),\
-         np.arange(2001, 2020), np.arange(2005, 2021), np.arange(2001, 2020)]
-labels = ['Broadleaf\nForest %', 'Savanna and\nGrassland %', 'LAI', 'Burned\nArea km$^{2}$', \
-          'Isoprene\n10$^{15}$ mol cm$^{-2}$', 'Methanol\nppbv', 'HCHO\n10$^{16}$ mol cm$^{-2}$', \
-              'CO\n10$^{17}$ mol cm$^{-2}$', 'NO$_{2}$\n10$^{15}$ mol cm$^{-2}$', 'AOD']
-alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
-cm =  1/2.54
-fontsize = 8 
-fig, ax = plt.subplots(nrows=5, ncols=2, figsize=(12*cm,16*cm))
-ax = ax.ravel()
-for i in range(10):
-    ax[i].plot(years[i], data[i], label = f'{labels[i]}') 
-    ax[i].fill_between(years[i], data[i]-errors[i], \
-                      data[i]+errors[i], alpha = 0.3)
-    ax[i].set_ylabel(f'{labels[i]}', fontsize = fontsize)
-    ax[i].set_title(f'({alphabet[i]})', loc = 'left', fontsize = fontsize)
-    # ax[i].set_xlabel('Year', fontsize = 12)
-    ax[i].set_xlim(2001, 2020)
-    ax[i].set_xticks(year_ticks)
-    ax[i].tick_params(axis='both', which='major', labelsize=fontsize)
-    if i ==8 or i == 9:
-        ax[i].set_xlabel('Year', fontsize = fontsize)
-
-# fig.suptitle('Wet season')
-fig.tight_layout()
-# year_ticks = np.arange(2001, 2020, 2)
-# ax.set_xticks(year_ticks)
-# ax.set_ylim(-200, 400)
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/annual_through_time.png', dpi = 300)
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/annual_through_time_stderr.pdf')
-# 
-
-# =============================================================================
-# EGU version
-# =============================================================================
-year_ticks = np.arange(2001, 2020, 5)
-data = [broadleaf_regional*100, sg_regional*100] 
-errors = [broadleaf_error*100, sg_error*100] 
-
-years = [np.arange(2001, 2020), np.arange(2001, 2020)]
-labels = ['Broadleaf\nForest %', 'Savanna and\nGrassland %']
-alphabet = ['a', 'b']
-cm =  1/2.54
-fontsize = 28
-fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(42*cm,12*cm))
-ax = ax.ravel()
-for i in range(2):
-    ax[i].plot(years[i], data[i], label = f'{labels[i]}', lw = 3) 
-    ax[i].fill_between(years[i], data[i]-errors[i], \
-                      data[i]+errors[i], alpha = 0.3)
-    ax[i].set_ylabel(f'{labels[i]}', fontsize = fontsize)
-    ax[i].set_title(f'({alphabet[i]})', loc = 'left', fontsize = fontsize)
-    # ax[i].set_xlabel('Year', fontsize = 12)
-    ax[i].set_xlim(2001, 2020)
-    ax[i].set_xticks(year_ticks)
-    ax[i].set_yticks(np.arange(46, 55, 4))
-    ax[i].tick_params(axis='both', which='major', labelsize=24)
-    ax[i].set_xlabel('Year', fontsize = fontsize)
-
-# fig.suptitle('Wet season')
-fig.tight_layout()
-# year_ticks = np.arange(2001, 2020, 2)
-# ax.set_xticks(year_ticks)
-# ax.set_ylim(-200, 400)
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/lc_through_time_EGU.png', dpi = 300)
-# fig.savefig('C:/Users/s2261807/Documents/GitHub/SouthernAmazon_figures/annual_through_time_stderr.pdf')
-# 
+        
